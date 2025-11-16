@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
 #include "master.h"
 #include "config.h"
 #include "logger.h"
@@ -36,18 +37,18 @@ int master_start(void) {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(get_server_port());
+    server_addr.sin_port = htons(get_config()->port);
     
     // Bind
     if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("bind");
+        perror("bind failed");
         close(server_socket);
         return -1;
     }
     
     // Listen
     if (listen(server_socket, BACKLOG) < 0) {
-        perror("listen");
+        perror("listen failed");
         close(server_socket);
         return -1;
     }

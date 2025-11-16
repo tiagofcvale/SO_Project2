@@ -15,9 +15,16 @@ int main(void) {
     // Inicializar logger
     logger_init();
     
+    printf("A iniciar servidor HTTP com:\n");
+    printf("- Workers: %d\n", get_num_workers());
+    printf("- Threads por worker: %d\n", get_threads_per_worker());
+    printf("- Document root: %s\n", get_document_root());
+    printf("- Cache: %d MB\n", get_cache_size_mb());
+    
     // Iniciar servidor master
     if (master_start() != 0) {
         fprintf(stderr, "Erro ao iniciar servidor\n");
+        logger_cleanup();
         return 1;
     }
     
