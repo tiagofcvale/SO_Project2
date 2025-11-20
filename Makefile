@@ -1,14 +1,29 @@
 CC = cc
-CFLAGS = -Wall -Wextra -std=c99 -pthread
-SRCDIR = src
-SOURCES = $(SRCDIR)/main.c $(SRCDIR)/master.c $(SRCDIR)/config.c $(SRCDIR)/logger.c
-TARGET = httpserver
-OBJDIR = obj
+CFLAGS = -Wall -Wextra -Werror -std=c99 -pthread -D_XOPEN_SOURCE=700
+LIBS = -lrt
 
-$(TARGET): $(SOURCES)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
+SRCDIR = src
+OBJDIR = obj
+TARGET = httpserver
+SOURCES = src/main.c src/master.c src/worker.c src/thread_pool.c \
+          src/http.c src/config.c src/logger.c src/global.c
+
+OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+
+all: $(TARGET)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+	mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECTS) $(LIBS)
+
+run: $(TARGET)
+	./$(TARGET)
 
 clean:
 	rm -f $(TARGET)
+	rm -rf $(OBJDIR)
 
 .PHONY: clean

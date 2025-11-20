@@ -1,98 +1,67 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#include <string.h>
 
 #include "master.h"
 #include "config.h"
-#include "logger.h"
+#include "worker.h"
+#include "global.h"
 
-#define BACKLOG 10
-#define BUFFER_SIZE 4096
-
-static int server_socket = -1;
+#define BACKLOG 128
 
 int master_start(void) {
-    struct sockaddr_in server_addr;
-    int opt = 1;
-    
-    // Criar socket
-    server_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket < 0) {
-        perror("socket");
-        return -1;
-    }
-    
-    // Configurar socket para reutilizar endereço
-    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
-        perror("setsockopt");
-        close(server_socket);
-        return -1;
-    }
-    
-    // Configurar endereço do servidor
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(get_config()->port);
-    
-    // Bind
-    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("bind failed");
-        close(server_socket);
-        return -1;
-    }
-    
-    // Listen
-    if (listen(server_socket, BACKLOG) < 0) {
-        perror("listen failed");
-        close(server_socket);
-        return -1;
-    }
-    
-    printf("Servidor iniciado na porta %d\n", get_server_port());
-    printf("Aguardando conexões...\n");
-    
-    // Loop principal - aceitar conexões
-    while (1) {
-        struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
-        int client_socket;
-        
-        // Aceitar conexão
-        client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
-        if (client_socket < 0) {
-            perror("accept");
-            continue;
-        }
-        
-        printf("Cliente conectado: %s:%d\n", 
-               inet_ntoa(client_addr.sin_addr), 
-               ntohs(client_addr.sin_port));
-        
-        // Enviar resposta HTTP simples
-        char response[] = "HTTP/1.1 200 OK\r\n"
-                         "Content-Type: text/plain\r\n"
-                         "Content-Length: 12\r\n"
-                         "\r\n"
-                         "Hello World!";
-        
-        send(client_socket, response, strlen(response), 0);
-        close(client_socket);
-        
-        printf("Resposta enviada, conexão fechada\n");
-    }
-    
-    return 0;
-}
 
-int master_stop(void) {
-    if (server_socket != -1) {
-        close(server_socket);
-        server_socket = -1;
+    struct sockaddr_in addr;
+    int opt = 1;
+
+    // Criar listen socket
+    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        perror("socket");
+        exit(1);
     }
+
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family      = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port        = htons(get_server_port());
+
+    if (bind(listen_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("bind");
+        exit(1);
+    }
+
+    if (listen(listen_fd, BACKLOG) < 0) {
+        perror("listen");
+        exit(1);
+    }
+
+    printf("Master: Servidor a ouvir na porta %d\n", get_server_port());
+    printf("Master: A criar %d workers...\n", get_num_workers());
+
+    // Criar workers
+    for (int i = 0; i < get_num_workers(); i++) {
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            perror("fork");
+            exit(1);
+        }
+
+        if (pid == 0) {
+            worker_main();
+            exit(0);
+        }
+    }
+
+    // Master não aceita nada
+    printf("Master: Workers criados. Master em standby.\n");
+
+    while (1) pause();
     return 0;
 }
