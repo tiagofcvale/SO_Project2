@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -11,6 +12,32 @@
 
 #define MAX_REQ 2048
 #define MAX_REQ_LINE 2048
+
+// MIME file
+
+static const char* mime_from_path(const char* path) {
+
+    // Find last extention
+    const char* ext = strrchr(path, '.');
+    if (!ext) return "application/octet_stream";
+
+    ext++;  // skip '.'
+
+    if (strcasecmp(ext, "html") == 0) return "text/html; charset=utf-8";
+    if (strcasecmp(ext, "htm")  == 0) return "text/html; charset=utf-8";
+    if (strcasecmp(ext, "css")  == 0) return "text/css";
+    if (strcasecmp(ext, "js")   == 0) return "application/javascript";
+    if (strcasecmp(ext, "json") == 0) return "application/json; charset=utf-8";
+    if (strcasecmp(ext, "png")  == 0) return "image/png";
+    if (strcasecmp(ext, "jpg")  == 0) return "image/jpeg";
+    if (strcasecmp(ext, "jpeg") == 0) return "image/jpeg";
+    if (strcasecmp(ext, "gif")  == 0) return "image/gif";
+    if (strcasecmp(ext, "svg")  == 0) return "image/svg+xml";
+    if (strcasecmp(ext, "txt")  == 0) return "text/plain; charset=utf-8";
+    if (strcasecmp(ext, "pdf")  == 0) return "application/pdf";
+
+    return "application/octet-stream";  // default
+}
 
 // Read line until '\n'
 
@@ -101,14 +128,16 @@ static void serve_file(int fd, const char *fullpath) {
         return;
     }
 
-    // Simple header
+    const char *mime = mime_from_path(fullpath);
+
     char header[256];
     int h = snprintf(header, sizeof(header),
         "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html; charset=utf-8\r\n"
+        "Content-Type: %s\r\n"
         "Content-Length: %ld\r\n"
         "Connection: close\r\n"
         "\r\n",
+        mime,
         st.st_size
     );
 
