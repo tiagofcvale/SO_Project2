@@ -91,25 +91,41 @@ static int parse_request(int client_fd, http_request_t* req) {
     return 0;
 }
 
-// HTTP errors
+// HTTP errors with personalized html
 
-static void send_error(int client_socket, int code, const char* msg) {
-    char body[256];
-    sprintf(body, "%d %s\n",code,msg);
+static void send_error_page(int fd, int code, const char* msg) {
+    char path[256];
+    snprintf(path, sizeof(path), "%s/errors/%d.html",
+             get_document_root(), code);
 
-    char header[256];
+    int f = open(path, O_RDONLY);
 
-    int h = snprintf(header, sizeof(header),
-        "HTTP/1.1 %d %s \r\n"
-        "Content-Type: text/plain\r\n"
-        "Content-Length: %zu\r\n"
-        "Connection: close\r\n"
-        "\r\n",
-        code, msg, strlen(body)
-    );
+    // If exists, serve
+    if (f>=0) {
+        struct stat st;
+        fstat(f, &st);
 
-    send(client_socket, header, h, 0);
-    send(client_socket, body, strlen(body), 0);
+        char header[256];
+        int h = snprintf(header, sizeof(header),
+            "HTTP/1.1 %d %s\r\n"
+            "Content-Type: text/html; charset=uth-8\r\n"
+            "Content-Length: %ld\r\n"
+            "Connection: close\r\n"
+            "\r\n",
+            code, msg, st.st_size
+        );
+
+        send(fd, header, h, 0);
+
+        char buf[4096];
+        ssize_t n;
+
+        while ((n = read(f, buf, sizeof(buf))) > 0)
+            send(fd, buf, n, 0);
+        
+        close(f);
+        return;
+    }
 }
 
 // Serve file
@@ -117,14 +133,14 @@ static void send_error(int client_socket, int code, const char* msg) {
 static void serve_file(int fd, const char *fullpath) {
     int file_fd = open(fullpath, O_RDONLY);
     if (file_fd < 0) {
-        send_error(fd, 500, "Internal Server Error");
+        send_error_page(fd, 500, "Internal Server Error");
         return;
     }
 
     struct stat st;
     if (stat(fullpath, &st) < 0) {
         close(file_fd);
-        send_error(fd, 500, "Internal Server Error");
+        send_error_page(fd, 500, "Internal Server Error");
         return;
     }
 
@@ -166,7 +182,7 @@ void http_handle_request(int client_socket) {
 
     // Only GET for now
     if (strcmp(req.method, "GET") != 0) {
-        send_error(client_socket, 501, "Not Implemented");
+        send_error_page(client_socket, 501, "Not Implemented");
         close(client_socket);
         return;
     }
@@ -183,14 +199,14 @@ void http_handle_request(int client_socket) {
     // Verify existence
     struct stat st;
     if (stat(fullpath, &st) < 0) {
-        send_error(client_socket, 404, "Not Found");
+        send_error_page(client_socket, 404, "Not Found");
         close(client_socket);
         return;
     }
 
     // If its directory 403
     if (S_ISDIR(st.st_mode)) {
-        send_error(client_socket, 403, "Forbidden");
+        send_error_page(client_socket, 403, "Forbidden");
         close(client_socket);
         return;
     }
