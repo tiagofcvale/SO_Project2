@@ -17,6 +17,9 @@ typedef struct {
     char user_agent[MAX_HEADER];
     char accept[MAX_HEADER];
 
+    // Client IP
+    char client_ip[64];
+
 } http_request_t;
 
 void http_handle_request(int client_socket);

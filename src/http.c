@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -9,6 +10,7 @@
 
 #include "http.h"
 #include "config.h"
+#include "logger.h"
 
 #define MAX_REQ 2048
 #define MAX_REQ_LINE 2048
@@ -175,7 +177,14 @@ static void serve_file(int fd, const char *fullpath) {
 void http_handle_request(int client_socket) {
     http_request_t req = {0};
 
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    getpeername(client_socket, (struct sockaddr *)&addr, &addrlen);
+    snprintf(req.client_ip, sizeof(req.client_ip), "%s", inet_ntoa(addr.sin_addr));
+
     if (parse_request(client_socket, &req) < 0) {
+        send_error_page(client_socket, 400, "Bad Request");
+        logger_log(req.client_ip, "-", "-", 400, 0);
         close(client_socket);
         return;
     }
@@ -183,6 +192,7 @@ void http_handle_request(int client_socket) {
     // Only GET for now
     if (strcmp(req.method, "GET") != 0) {
         send_error_page(client_socket, 501, "Not Implemented");
+        logger_log(req.client_ip, req.method, req.path, 501, 0);
         close(client_socket);
         return;
     }
@@ -200,6 +210,7 @@ void http_handle_request(int client_socket) {
     struct stat st;
     if (stat(fullpath, &st) < 0) {
         send_error_page(client_socket, 404, "Not Found");
+        logger_log(req.client_ip, req.method, req.path, 404, 0);
         close(client_socket);
         return;
     }
@@ -207,12 +218,14 @@ void http_handle_request(int client_socket) {
     // If its directory 403
     if (S_ISDIR(st.st_mode)) {
         send_error_page(client_socket, 403, "Forbidden");
+        logger_log(req.client_ip, req.method, req.path, 403, 0);
         close(client_socket);
         return;
     }
 
     // Serve file
     serve_file(client_socket, fullpath);
+    logger_log(req.client_ip, req.method, req.path, 200, st.st_size);
 
     close(client_socket);
 }
