@@ -5,8 +5,17 @@ LIBS = -lrt
 SRCDIR = src
 OBJDIR = obj
 TARGET = httpserver
-SOURCES = src/main.c src/master.c src/worker.c src/thread_pool.c \
-          src/http.c src/config.c src/logger.c src/global.c
+SOURCES = \
+    $(SRCDIR)/main.c \
+    $(SRCDIR)/master.c \
+    $(SRCDIR)/worker.c \
+    $(SRCDIR)/thread_pool.c \
+    $(SRCDIR)/http.c \
+    $(SRCDIR)/cache.c \
+    $(SRCDIR)/config.c \
+    $(SRCDIR)/logger.c \
+    $(SRCDIR)/global.c
+
 
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 

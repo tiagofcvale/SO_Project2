@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
@@ -11,6 +12,7 @@
 #include "http.h"
 #include "config.h"
 #include "logger.h"
+#include "cache.h"
 
 #define MAX_REQ 2048
 #define MAX_REQ_LINE 2048
@@ -130,9 +132,35 @@ static void send_error_page(int fd, int code, const char* msg) {
     }
 }
 
-// Serve file
+// Serve file (with cache support)
 
 static void serve_file(int fd, const char *fullpath) {
+
+    // Trying to read cache first
+    char* cached_data = NULL;
+    size_t cached_size = 0;
+
+    if (cache_get(fullpath, &cached_data, &cached_size)) {
+        
+        const char* mime = mime_from_path(fullpath);
+
+        char header[256];
+        int h = snprintf(header, sizeof(header),
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: %s\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n"
+            "\r\n",
+            mime,
+            cached_size
+        );
+
+        send(fd, header, h, 0);
+        send(fd,cached_data, cached_size, 0);
+        return;
+    }
+
+    // If not in cache, read from disk
     int file_fd = open(fullpath, O_RDONLY);
     if (file_fd < 0) {
         send_error_page(fd, 500, "Internal Server Error");
@@ -146,7 +174,7 @@ static void serve_file(int fd, const char *fullpath) {
         return;
     }
 
-    const char *mime = mime_from_path(fullpath);
+    const char* mime = mime_from_path(fullpath);
 
     char header[256];
     int h = snprintf(header, sizeof(header),
@@ -161,15 +189,36 @@ static void serve_file(int fd, const char *fullpath) {
 
     send(fd, header, h, 0);
 
-    // Send file
-    char buf[4096];
-    ssize_t n;
+    // Read file
+    char* file_data = malloc(st.st_size);
+    if (!file_data) {
+        char buf[4096];
+        ssize_t n;
 
-    while ((n = read(file_fd, buf, sizeof(buf))) > 0) {
-        send(fd, buf, n, 0);
+        while ((n = read(file_fd, buf, sizeof(buf))) > 0 )
+            send(fd, buf, n, 0);
+        
+        close(file_fd);
+        return;
     }
 
+    // Load internal file in RAM
+    ssize_t total = read(file_fd, file_data, st.st_size);
     close(file_fd);
+
+    if (total != st.st_size) {
+        send_error_page(fd, 500, "Internal Server Error");
+        free(file_data);
+        return;
+    }
+
+    // Send to client
+    send(fd, file_data, st.st_size, 0);
+
+    // Put in CACHE
+    cache_put(fullpath, file_data, st.st_size);
+
+    free(file_data);
 }
 
 // Principal function: serve file

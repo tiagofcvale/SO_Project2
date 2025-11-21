@@ -4,6 +4,7 @@
 #include "master.h"
 #include "config.h"
 #include "logger.h"
+#include "cache.h"
 
 int main(void) {
     // Carregar configuração
@@ -14,6 +15,7 @@ int main(void) {
     
     // Inicializar logger
     logger_init();
+    cache_init(get_cache_size_mb());
     
     printf("A iniciar servidor HTTP com:\n");
     printf("- Workers: %d\n", get_num_workers());
