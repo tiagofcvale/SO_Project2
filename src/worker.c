@@ -3,45 +3,41 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
-#include "global.h"
+#include "config.h"
 #include "worker.h"
 #include "thread_pool.h"
-#include "config.h"
 
-// Semáforo simples de accept no processo (mutex do SO)
-static pthread_mutex_t accept_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-static thread_pool_t pool;
-
-void worker_main(void) {
+void worker_main(int listen_fd) {
+    // criar thread pool local deste worker
+    thread_pool_t pool;
+    thread_pool_init(&pool, get_threads_per_worker());
 
     printf("Worker %d iniciado.\n", getpid());
 
-    // Criar thread pool deste worker
-    thread_pool_init(&pool, get_threads_per_worker());
-
     while (1) {
+        struct sockaddr_in client_addr;
+        socklen_t len = sizeof(client_addr);
 
-        int client_fd;
-        struct sockaddr_in cli;
-        socklen_t len = sizeof(cli);
+        // cada worker faz accept() directamente
+        int client_socket = accept(listen_fd,
+                                   (struct sockaddr *)&client_addr,
+                                   &len);
 
-        // -------------------------
-        // ACCEPT SINCRONIZADO
-        // -------------------------
-        pthread_mutex_lock(&accept_mutex);
-        client_fd = accept(listen_fd, (struct sockaddr*)&cli, &len);
-        pthread_mutex_unlock(&accept_mutex);
-
-        if (client_fd < 0) {
-            perror("accept");
+        if (client_socket < 0) {
+            perror("worker accept");
             continue;
         }
 
-        printf("Worker %d aceitou socket %d\n", getpid(), client_fd);
+        printf("Worker %d recebeu socket %d de %s:%d\n",
+               getpid(),
+               client_socket,
+               inet_ntoa(client_addr.sin_addr),
+               ntohs(client_addr.sin_port));
 
-        // Enviar socket para a thread pool
-        thread_pool_add(&pool, client_fd);
+        // mandar o socket para uma thread deste worker
+        thread_pool_add(&pool, client_socket);
+        // a thread é que faz http_handle_request() e close()
     }
 }

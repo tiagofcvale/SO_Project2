@@ -1,6 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// ------------------------------------------------------------
+// Estrutura da configuração do servidor
+// ------------------------------------------------------------
 typedef struct {
     int port;
     char document_root[256];
@@ -12,10 +15,18 @@ typedef struct {
     int timeout_seconds;
 } server_config_t;
 
+
+// ------------------------------------------------------------
+// API
+// ------------------------------------------------------------
+
+// Carregar configurações do ficheiro server.conf
 int load_config(const char *filename);
+
+// Obter ponteiro para toda a estrutura
 const server_config_t *get_config(void);
 
-// Funções de acesso individual (para compatibilidade)
+// Getters individuais
 int get_server_port(void);
 const char *get_document_root(void);
 int get_num_workers(void);

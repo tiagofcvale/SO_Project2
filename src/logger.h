@@ -1,11 +1,17 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <time.h>
-
+// Inicializar o logger
 void logger_init(void);
-void logger_log(const char *client_ip, const char *method, const char *path,
-                int status_code, long content_length);
+
+// Registar uma linha de log
+void logger_log(const char *ip,
+                const char *method,
+                const char *path,
+                int status,
+                long size);
+
+// Fechar ficheiro de log
 void logger_cleanup(void);
 
 #endif

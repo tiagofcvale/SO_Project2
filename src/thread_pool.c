@@ -7,7 +7,7 @@
 #include "http.h"
 
 // --------------------------------------------------------------
-// queue_pop — usado pelas threads do worker
+// queue_pop — usado pelas threads do worker (consumidores)
 // --------------------------------------------------------------
 static int queue_pop(thread_pool_t *pool) {
     thread_pool_queue_t *q = &pool->queue;
@@ -28,7 +28,7 @@ static int queue_pop(thread_pool_t *pool) {
 }
 
 // --------------------------------------------------------------
-// worker_thread — função que cada thread do worker executa
+// worker_thread — função executada por cada thread do worker
 // --------------------------------------------------------------
 static void *worker_thread(void *arg) {
     thread_pool_t *pool = arg;
@@ -39,14 +39,14 @@ static void *worker_thread(void *arg) {
         printf("  [Thread %ld] Recebi socket %d\n",
                pthread_self(), client_socket);
 
-        http_handle_request(client_socket);
+        http_handle_request(client_socket);   // TRATAR PEDIDO HTTP
     }
 
     return NULL;
 }
 
 // --------------------------------------------------------------
-// thread_pool_add — coloca um socket na queue local do worker
+// thread_pool_add — produtores (worker.c) inserem socket na fila
 // --------------------------------------------------------------
 void thread_pool_add(thread_pool_t *pool, int client_socket) {
     thread_pool_queue_t *q = &pool->queue;
@@ -65,11 +65,11 @@ void thread_pool_add(thread_pool_t *pool, int client_socket) {
 }
 
 // --------------------------------------------------------------
-// thread_pool_init — cria a queue interna e as threads do worker
+// thread_pool_init — cria fila interna e threads do worker
 // --------------------------------------------------------------
 void thread_pool_init(thread_pool_t *pool, int n) {
 
-    // Inicializar queue interna do worker
+    // Inicializar queue interna
     pool->queue.front = 0;
     pool->queue.rear  = 0;
     pool->queue.count = 0;

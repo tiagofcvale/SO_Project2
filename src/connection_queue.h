@@ -3,6 +3,7 @@
 
 #define MAX_QUEUE_SIZE 100
 
+// Estrutura que vive na SHM
 typedef struct {
     int sockets[MAX_QUEUE_SIZE];
     int front;

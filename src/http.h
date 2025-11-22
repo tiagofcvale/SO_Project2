@@ -1,27 +1,23 @@
 #ifndef HTTP_H
 #define HTTP_H
 
-#define MAX_METHOD 16
-#define MAX_PATH 1024
-#define MAX_VERSION 16
-#define MAX_HEADER 512
+#include <stddef.h>
 
-// HTTP order structure
+// Estrutura com os campos relevantes do pedido HTTP
 typedef struct {
-    char method[MAX_METHOD];
-    char path[MAX_PATH];
-    char version[MAX_VERSION];
+    char method[8];
+    char path[1024];
+    char version[16];
 
-    // util headers
-    char host[MAX_HEADER];
-    char user_agent[MAX_HEADER];
-    char accept[MAX_HEADER];
+    char host[512];
+    char user_agent[512];
+    char accept[512];
 
-    // Client IP
     char client_ip[64];
-
 } http_request_t;
 
+
+// Função principal chamada pelas threads de cada worker
 void http_handle_request(int client_socket);
 
 #endif

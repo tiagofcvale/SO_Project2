@@ -1,56 +1,62 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
 #include <time.h>
-#include <unistd.h>
+#include <string.h>
 
 #include "logger.h"
 #include "config.h"
 
-static FILE *log_file = NULL;
-static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+static FILE *log_fp = NULL;
 
-// Init Logger (server.conf LOG_FILE)
 
+// ------------------------------------------------------------
+// Inicializar logger
+// ------------------------------------------------------------
 void logger_init(void) {
-    const char *filename = get_log_file();
 
-    log_file = fopen(filename, "a");
-    if (!log_file) {
-        perror("logger_init: fopen");
-        exit(1);
+    const char *logfile = get_log_file();
+
+    log_fp = fopen(logfile, "a");
+    if (!log_fp) {
+        perror("logger_init fopen");
+        log_fp = stdout;  // fallback
     }
+
+    fprintf(log_fp, "===== Servidor iniciado =====\n");
+    fflush(log_fp);
 }
 
-// Read an entrance at LOG_FILE
 
-void logger_log(const char *client_ip, const char *method, const char *path,
-                int status_code, long content_length)
+// ------------------------------------------------------------
+// Registar um evento no log
+// ------------------------------------------------------------
+void logger_log(const char *ip,
+                const char *method,
+                const char *path,
+                int status,
+                long size)
 {
-    if (!log_file) return;
+    if (!log_fp) return;
 
-    pthread_mutex_lock(&log_mutex);
-
-    // Timestamp
     time_t now = time(NULL);
-    struct tm *t = localtime(&now);
+    struct tm *tm_info = localtime(&now);
 
-    char timestamp[64];
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", t);
+    char tbuf[32];
+    strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", tm_info);
 
-    // Final format
-    fprintf(log_file, "%s - [%s] \"%s %s\" %d %ld\n",
-            client_ip, timestamp, method, path, status_code, content_length);
+    fprintf(log_fp, "[%s] %s \"%s %s\" %d %ld\n",
+            tbuf, ip, method, path, status, size);
 
-    fflush(log_file);
-
-    pthread_mutex_unlock(&log_mutex);
+    fflush(log_fp);
 }
 
-// Close file
 
+// ------------------------------------------------------------
+// Finalizar logger
+// ------------------------------------------------------------
 void logger_cleanup(void) {
-    if (log_file)
-        fclose(log_file);
+    if (log_fp && log_fp != stdout) {
+        fprintf(log_fp, "===== Servidor desligado =====\n");
+        fclose(log_fp);
+    }
 }

@@ -13,106 +13,133 @@
 #include "config.h"
 #include "logger.h"
 #include "cache.h"
+#include "stats.h"
 
 #define MAX_REQ 2048
 #define MAX_REQ_LINE 2048
 
-// MIME file
 
+// ------------------------------------------------------------
+// MIME types
+// ------------------------------------------------------------
 static const char* mime_from_path(const char* path) {
 
-    // Find last extention
     const char* ext = strrchr(path, '.');
-    if (!ext) return "application/octet_stream";
+    if (!ext) return "application/octet-stream";
+    ext++;
 
-    ext++;  // skip '.'
+    if (!strcasecmp(ext, "html")) return "text/html; charset=utf-8";
+    if (!strcasecmp(ext, "htm"))  return "text/html; charset=utf-8";
+    if (!strcasecmp(ext, "css"))  return "text/css";
+    if (!strcasecmp(ext, "js"))   return "application/javascript";
+    if (!strcasecmp(ext, "json")) return "application/json; charset=utf-8";
+    if (!strcasecmp(ext, "png"))  return "image/png";
+    if (!strcasecmp(ext, "jpg"))  return "image/jpeg";
+    if (!strcasecmp(ext, "jpeg")) return "image/jpeg";
+    if (!strcasecmp(ext, "gif"))  return "image/gif";
+    if (!strcasecmp(ext, "svg"))  return "image/svg+xml";
+    if (!strcasecmp(ext, "txt"))  return "text/plain; charset=utf-8";
+    if (!strcasecmp(ext, "pdf"))  return "application/pdf";
 
-    if (strcasecmp(ext, "html") == 0) return "text/html; charset=utf-8";
-    if (strcasecmp(ext, "htm")  == 0) return "text/html; charset=utf-8";
-    if (strcasecmp(ext, "css")  == 0) return "text/css";
-    if (strcasecmp(ext, "js")   == 0) return "application/javascript";
-    if (strcasecmp(ext, "json") == 0) return "application/json; charset=utf-8";
-    if (strcasecmp(ext, "png")  == 0) return "image/png";
-    if (strcasecmp(ext, "jpg")  == 0) return "image/jpeg";
-    if (strcasecmp(ext, "jpeg") == 0) return "image/jpeg";
-    if (strcasecmp(ext, "gif")  == 0) return "image/gif";
-    if (strcasecmp(ext, "svg")  == 0) return "image/svg+xml";
-    if (strcasecmp(ext, "txt")  == 0) return "text/plain; charset=utf-8";
-    if (strcasecmp(ext, "pdf")  == 0) return "application/pdf";
-
-    return "application/octet-stream";  // default
+    return "application/octet-stream";
 }
 
-// Read line until '\n'
 
+// ------------------------------------------------------------
+// read_line — lê linha sem bloquear
+// ------------------------------------------------------------
 static int read_line(int fd, char* buf, int max) {
     int i = 0;
+    char c;
 
-    while (i < max) {
-        char c;
+    while (i < max - 1) {
         int n = recv(fd, &c, 1, 0);
-        if (n <= 0) return -1;
-        
+
+        if (n == 0) {
+            // cliente fechou a ligação
+            break;
+        }
+
+        if (n < 0) {
+            // interrupções do sistema → tentar de novo
+            if (errno == EINTR) continue;
+
+            // socket não tem dados ainda → tentar de novo
+            if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+
+            return -1;
+        }
+
         buf[i++] = c;
 
-        if (c == '\n') break;
+        if (c == '\n')
+            break;
     }
 
     buf[i] = '\0';
     return i;
 }
 
-// Parser of http request
 
+// ------------------------------------------------------------
+// parse_request — separa método, caminho, headers
+// ------------------------------------------------------------
 static int parse_request(int client_fd, http_request_t* req) {
     char line[MAX_REQ_LINE];
 
-    // First Line: GET /x HTTP/1.1
-    if (read_line(client_fd, line, sizeof(line)) <= 0) 
-        return -1;
-    
-    sscanf(line, "%s %s %s", req->method, req->path, req->version);
+    printf("[PARSE] A ler request...\n");
 
-    // Headers per line
+    // Primeira linha
+    int n = read_line(client_fd, line, sizeof(line));
+    printf("[PARSE] First line raw: '%s' (n=%d)\n", line, n);
+
+    if (n <= 0) return -1;
+
+    sscanf(line, "%7s %1023s %15s", req->method, req->path, req->version);
+    printf("[PARSE] Método='%s' Path='%s' Versão='%s'\n",
+           req->method, req->path, req->version);
+
+    // Headers
     while (1) {
-        if (read_line(client_fd, line, sizeof(line)) <= 0)
-            return -1;
-        
-        // empty line: end of headers
-        if (strcmp(line, "\r\n") == 0)
+        n = read_line(client_fd, line, sizeof(line));
+        printf("[PARSE] Header line: '%s' (n=%d)\n", line, n);
+
+        if (n <= 0) return -1;
+
+        if (!strcmp(line, "\r\n")) {
+            printf("[PARSE] Fim dos headers\n");
             break;
-        
-        if (sscanf(line, "Host: %511[^\r\n]", req->host) == 1)
-            continue;
+        }
 
-        if (sscanf(line, "User-Agent: %511[^\r\n]", req->user_agent) == 1)
-            continue;
-
-        if (sscanf(line, "Accept: %511[^\r\n]", req->accept) == 1)
-            continue;
+        sscanf(line, "Host: %511[^\r\n]", req->host);
+        sscanf(line, "User-Agent: %511[^\r\n]", req->user_agent);
+        sscanf(line, "Accept: %511[^\r\n]", req->accept);
     }
 
     return 0;
 }
 
-// HTTP errors with personalized html
 
+
+// ------------------------------------------------------------
+// send_error_page
+// ------------------------------------------------------------
 static void send_error_page(int fd, int code, const char* msg) {
-    char path[256];
-    snprintf(path, sizeof(path), "%s/errors/%d.html",
+
+    char errpath[256];
+    snprintf(errpath, sizeof(errpath), "%s/errors/%d.html",
              get_document_root(), code);
 
-    int f = open(path, O_RDONLY);
+    int f = open(errpath, O_RDONLY);
 
-    // If exists, serve
-    if (f>=0) {
+    if (f >= 0) {
         struct stat st;
         fstat(f, &st);
 
         char header[256];
         int h = snprintf(header, sizeof(header),
             "HTTP/1.1 %d %s\r\n"
-            "Content-Type: text/html; charset=uth-8\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
             "Content-Length: %ld\r\n"
             "Connection: close\r\n"
             "\r\n",
@@ -123,25 +150,45 @@ static void send_error_page(int fd, int code, const char* msg) {
 
         char buf[4096];
         ssize_t n;
-
         while ((n = read(f, buf, sizeof(buf))) > 0)
             send(fd, buf, n, 0);
-        
+
         close(f);
         return;
     }
+
+    // fallback
+    char body[256];
+    int blen = snprintf(body, sizeof(body),
+        "<html><body><h1>%d %s</h1></body></html>", code, msg);
+
+    char header[256];
+    int h = snprintf(header, sizeof(header),
+        "HTTP/1.1 %d %s\r\n"
+        "Content-Type: text/html; charset=utf-8\r\n"
+        "Content-Length: %d\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        code, msg, blen
+    );
+
+    send(fd, header, h, 0);
+    send(fd, body, blen, 0);
 }
 
-// Serve file (with cache support)
 
+// ------------------------------------------------------------
+// serve_file — tenta cache primeiro
+// ------------------------------------------------------------
 static void serve_file(int fd, const char *fullpath) {
 
-    // Trying to read cache first
+    printf("[SERVE] fullpath='%s'\n", fullpath);
+
     char* cached_data = NULL;
     size_t cached_size = 0;
 
     if (cache_get(fullpath, &cached_data, &cached_size)) {
-        
+
         const char* mime = mime_from_path(fullpath);
 
         char header[256];
@@ -151,17 +198,17 @@ static void serve_file(int fd, const char *fullpath) {
             "Content-Length: %zu\r\n"
             "Connection: close\r\n"
             "\r\n",
-            mime,
-            cached_size
+            mime, cached_size
         );
 
         send(fd, header, h, 0);
-        send(fd,cached_data, cached_size, 0);
+        send(fd, cached_data, cached_size, 0);
         return;
     }
 
-    // If not in cache, read from disk
     int file_fd = open(fullpath, O_RDONLY);
+    printf("[SERVE] open() file_fd=%d\n", file_fd);
+
     if (file_fd < 0) {
         send_error_page(fd, 500, "Internal Server Error");
         return;
@@ -183,53 +230,59 @@ static void serve_file(int fd, const char *fullpath) {
         "Content-Length: %ld\r\n"
         "Connection: close\r\n"
         "\r\n",
-        mime,
-        st.st_size
+        mime, st.st_size
     );
+    printf("[SERVE] header enviado (%d bytes)\n", h);
+
 
     send(fd, header, h, 0);
 
-    // Read file
+    printf("[SERVE] ficheiro enviado (%ld bytes)\n", st.st_size);
+
+
     char* file_data = malloc(st.st_size);
     if (!file_data) {
+
         char buf[4096];
         ssize_t n;
-
-        while ((n = read(file_fd, buf, sizeof(buf))) > 0 )
+        while ((n = read(file_fd, buf, sizeof(buf))) > 0)
             send(fd, buf, n, 0);
-        
+
         close(file_fd);
         return;
     }
 
-    // Load internal file in RAM
     ssize_t total = read(file_fd, file_data, st.st_size);
     close(file_fd);
 
     if (total != st.st_size) {
-        send_error_page(fd, 500, "Internal Server Error");
         free(file_data);
+        send_error_page(fd, 500, "Internal Server Error");
         return;
     }
 
-    // Send to client
     send(fd, file_data, st.st_size, 0);
 
-    // Put in CACHE
     cache_put(fullpath, file_data, st.st_size);
 
     free(file_data);
 }
 
-// Principal function: serve file
 
+// ------------------------------------------------------------
+// http_handle_request
+// ------------------------------------------------------------
 void http_handle_request(int client_socket) {
+
+    printf("[HTTP] Entrou no http_handle_request com socket %d\n", client_socket);
+
     http_request_t req = {0};
 
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
     getpeername(client_socket, (struct sockaddr *)&addr, &addrlen);
-    snprintf(req.client_ip, sizeof(req.client_ip), "%s", inet_ntoa(addr.sin_addr));
+    snprintf(req.client_ip, sizeof(req.client_ip),
+             "%s", inet_ntoa(addr.sin_addr));
 
     if (parse_request(client_socket, &req) < 0) {
         send_error_page(client_socket, 400, "Bad Request");
@@ -238,7 +291,6 @@ void http_handle_request(int client_socket) {
         return;
     }
 
-    // Only GET for now
     if (strcmp(req.method, "GET") != 0) {
         send_error_page(client_socket, 501, "Not Implemented");
         logger_log(req.client_ip, req.method, req.path, 501, 0);
@@ -246,16 +298,13 @@ void http_handle_request(int client_socket) {
         return;
     }
 
-    // index.html
-    if (strcmp(req.path, "/") == 0)
+    if (!strcmp(req.path, "/"))
         strcpy(req.path, "/index.html");
 
-    // Build real path
     char fullpath[1024];
     snprintf(fullpath, sizeof(fullpath), "%s%s",
              get_document_root(), req.path);
 
-    // Verify existence
     struct stat st;
     if (stat(fullpath, &st) < 0) {
         send_error_page(client_socket, 404, "Not Found");
@@ -264,7 +313,6 @@ void http_handle_request(int client_socket) {
         return;
     }
 
-    // If its directory 403
     if (S_ISDIR(st.st_mode)) {
         send_error_page(client_socket, 403, "Forbidden");
         logger_log(req.client_ip, req.method, req.path, 403, 0);
@@ -272,7 +320,6 @@ void http_handle_request(int client_socket) {
         return;
     }
 
-    // Serve file
     serve_file(client_socket, fullpath);
     logger_log(req.client_ip, req.method, req.path, 200, st.st_size);
 

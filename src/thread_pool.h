@@ -10,7 +10,6 @@ typedef struct {
     int front;
     int rear;
     int count;
-
     pthread_mutex_t mutex;
     pthread_cond_t cond_non_empty;
     pthread_cond_t cond_non_full;
@@ -22,7 +21,7 @@ typedef struct {
     thread_pool_queue_t queue;
 } thread_pool_t;
 
-void thread_pool_init(thread_pool_t *pool, int num_threads);
+void thread_pool_init(thread_pool_t *pool, int n);
 void thread_pool_add(thread_pool_t *pool, int client_socket);
 
 #endif
