@@ -5,89 +5,134 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <signal.h>
+#include <errno.h>
+#include <fcntl.h>
 
 #include "master.h"
 #include "config.h"
 #include "logger.h"
 #include "worker.h"
+#include "shared_mem.h"
+#include "semaphores.h"
 
-#define BACKLOG 10
+// Variáveis globais para limpeza no signal handler
+static int server_socket = -1;
+static shared_data_t *shm_data = NULL;
+static ipc_semaphores_t sems;
+static pid_t *worker_pids = NULL;
 
+// ------------------------------------------------------------
+// Enviar erro 503 se a fila estiver cheia
+// ------------------------------------------------------------
+void send_503_and_close(int fd) {
+    const char *resp = "HTTP/1.1 503 Service Unavailable\r\n"
+                       "Content-Type: text/plain\r\n"
+                       "Connection: close\r\n\r\n"
+                       "Server too busy, try again later.\n";
+    send(fd, resp, strlen(resp), 0);
+    close(fd);
+}
+
+// ------------------------------------------------------------
+// Handler para CTRL+C (Limpeza de IPC)
+// ------------------------------------------------------------
+void handle_sigint(int sig) {
+    (void)sig;
+    printf("\n[Master] Recebido SIGINT. A encerrar servidor...\n");
+
+    // 1. Matar processos workers
+    int n = get_num_workers();
+    if (worker_pids) {
+        for (int i = 0; i < n; i++) {
+            if (worker_pids[i] > 0) {
+                kill(worker_pids[i], SIGTERM);
+            }
+        }
+        free(worker_pids);
+    }
+
+    // 2. Fechar socket principal
+    if (server_socket >= 0) {
+        close(server_socket);
+    }
+
+    // 3. Limpar IPC (CRUCIAL: shm_unlink e sem_unlink)
+    shm_destroy(shm_data);
+    sem_cleanup_ipc(&sems);
+
+    logger_cleanup();
+    printf("[Master] Limpeza concluída. Adeus.\n");
+    exit(0);
+}
+
+// ------------------------------------------------------------
+// Função Principal do Master
+// ------------------------------------------------------------
 int master_start(void) {
+    signal(SIGINT, handle_sigint);
 
-    printf("Master: Configuração:\n");
-    printf("- Workers: %d\n", get_num_workers());
-    printf("- Threads por worker: %d\n", get_threads_per_worker());
-    printf("- Document root: %s\n", get_document_root());
-    printf("- Cache: %d MB\n", get_cache_size_mb());
+    // 1. Inicializar IPC
+    shm_data = shm_create();
+    if (!shm_data) return -1;
+    
+    // Inicializar Stats e Fila
+    stats_init(&shm_data->stats);
+    shm_data->queue.front = 0;
+    shm_data->queue.rear = 0;
+    shm_data->queue.count = 0;
 
-    // --------------------------------------------
-    // 1. Criar socket de escuta
-    // --------------------------------------------
-    int server_socket;
+    // Inicializar Semáforos
+    if (sem_init_ipc(&sems, get_max_queue_size()) < 0) {
+        shm_destroy(shm_data);
+        return -1;
+    }
+
+    // 2. Criar Socket
     struct sockaddr_in server_addr;
     int opt = 1;
 
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket < 0) {
-        perror("socket");
-        return -1;
-    }
-
+    if (server_socket < 0) { perror("socket"); return -1; }
     setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family      = AF_INET;
+    server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port        = htons(get_server_port());
+    server_addr.sin_port = htons(get_server_port());
 
-    if (bind(server_socket, (struct sockaddr *)&server_addr,
-             sizeof(server_addr)) < 0) {
-        perror("bind");
-        close(server_socket);
-        return -1;
+    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("bind"); return -1;
+    }
+    if (listen(server_socket, 128) < 0) {
+        perror("listen"); return -1;
     }
 
-    if (listen(server_socket, BACKLOG) < 0) {
-        perror("listen");
-        close(server_socket);
-        return -1;
-    }
+    printf("[Master] A ouvir na porta %d. A lançar workers...\n", get_server_port());
 
-    printf("Master: Servidor a ouvir na porta %d\n", get_server_port());
-
-    // --------------------------------------------
-    // 2. Criar workers (prefork)
-    // --------------------------------------------
+    // 3. Criar Workers
     int n_workers = get_num_workers();
-    printf("Master: A criar %d workers...\n", n_workers);
+    worker_pids = malloc(sizeof(pid_t) * n_workers);
 
     for (int i = 0; i < n_workers; i++) {
         pid_t pid = fork();
-
-        if (pid < 0) {
-            perror("fork");
-            exit(1);
-        }
-
         if (pid == 0) {
-            // Processo filho → worker
-            // Cada worker HERDA o server_socket aberto antes do fork
-            worker_main(server_socket);
-            // nunca volta
+            // Worker HERDA o server_socket e vai usá-lo
+            worker_main(server_socket); 
             exit(0);
+        } else {
+            worker_pids[i] = pid;
         }
     }
 
-    printf("Master: Workers criados. Master em standby.\n");
-
-    // Opcional: o master pode simplesmente ficar à espera para sempre
-    // enquanto os workers tratam das ligações
+    // 4. Mestre em modo de Monitorização
+    // O Mestre já não faz accept, apenas monitoriza e imprime stats
+    printf("[Master] Servidor Ativo. (CTRL+C para sair)\n");
+    
     while (1) {
-        pause();
+        sleep(5); // Imprimir stats a cada 5 segundos
+        stats_print(&shm_data->stats, sems.sem_stats);
     }
 
-    // (na prática nunca chega aqui)
-    close(server_socket);
     return 0;
 }

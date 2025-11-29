@@ -10,7 +10,7 @@
 
 int main(void) {
 
-    // Load config
+    // 1. Carregar configuração
     if (load_config("server.conf") != 0) {
         fprintf(stderr, "Erro ao carregar configuração.\n");
         return 1;
@@ -22,21 +22,23 @@ int main(void) {
     printf("- Document root: %s\n", get_document_root());
     printf("- Cache: %d MB\n", get_cache_size_mb());
 
-    // Start logger
+    // 2. Iniciar Logger
     logger_init();
 
-    // Start statistics module
-    stats_init(get_num_workers());
-
-    // Start cache
+    // 3. Iniciar Cache (Global para o Master, herdada pelos Workers no fork)
     cache_init(get_cache_size_mb());
 
-    // Start master server loop
+    // NOTA: stats_init removido daqui.
+    // Agora é o master_start() que inicializa as stats dentro da Memória Partilhada.
+
+    // 4. Iniciar o Mestre (Cria SHM, Semáforos, Sockets e Workers)
     if (master_start() != 0) {
-        fprintf(stderr, "Erro a iniciar servidor.\n");
+        fprintf(stderr, "Erro crítico a iniciar servidor.\n");
+        logger_cleanup();
         return 1;
     }
 
+    // Limpeza final (só chega aqui se o master retornar, o que não deve acontecer em loop)
     logger_cleanup();
     return 0;
 }
