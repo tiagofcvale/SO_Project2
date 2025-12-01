@@ -4,12 +4,38 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
 #include "config.h"
 #include "worker.h"
 #include "thread_pool.h"
+#include "shared_mem.h"
+#include "semaphores.h"
+
+// Global variables accessible to http.c
+shared_data_t* shm_data = NULL;
+ipc_semaphores_t sems;
 
 void worker_main(int listen_fd) {
+    // Attach to shared memory created by master
+    shm_data = shm_create();
+    if (!shm_data) {
+        fprintf(stderr, "Worker %d: Failed to attach to shared memory\n", getpid());
+        exit(1);
+    }
+
+    // Open existing semaphores created by master
+    sems.sem_empty = sem_open("/sem_ws_empty", 0);
+    sems.sem_full  = sem_open("/sem_ws_full", 0);
+    sems.sem_mutex = sem_open("/sem_ws_mutex", 0);
+    sems.sem_stats = sem_open("/sem_ws_stats", 0);
+    sems.sem_log   = sem_open("/sem_ws_log", 0);
+
+    if (sems.sem_empty == SEM_FAILED || sems.sem_full == SEM_FAILED || 
+        sems.sem_mutex == SEM_FAILED || sems.sem_stats == SEM_FAILED ||
+        sems.sem_log == SEM_FAILED) {
+        perror("Worker: Failed to open semaphores");
+        exit(1);
+    }
+
     // criar thread pool local deste worker
     thread_pool_t pool;
     thread_pool_init(&pool, get_threads_per_worker());

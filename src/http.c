@@ -14,10 +14,15 @@
 #include "logger.h"
 #include "cache.h"
 #include "stats.h"
+#include "shared_mem.h"
+#include "semaphores.h"
 
 #define MAX_REQ 2048
 #define MAX_REQ_LINE 2048
 
+// External references to shared memory and semaphores from worker.c
+extern shared_data_t* shm_data;
+extern ipc_semaphores_t sems;
 
 // ------------------------------------------------------------
 // MIME types
@@ -154,6 +159,12 @@ static void send_error_page(int fd, int code, const char* msg) {
             send(fd, buf, n, 0);
 
         close(f);
+        
+        // Update stats for error responses
+        if (shm_data) {
+            stats_update(&shm_data->stats, sems.sem_stats, code, st.st_size);
+        }
+        
         return;
     }
 
@@ -174,6 +185,11 @@ static void send_error_page(int fd, int code, const char* msg) {
 
     send(fd, header, h, 0);
     send(fd, body, blen, 0);
+    
+    // Update stats for fallback error responses
+    if (shm_data) {
+        stats_update(&shm_data->stats, sems.sem_stats, code, blen);
+    }
 }
 
 
@@ -203,8 +219,16 @@ static void serve_file(int fd, const char *fullpath) {
 
         send(fd, header, h, 0);
         send(fd, cached_data, cached_size, 0);
+        
+        // Update stats - cache hit! (status 200)
+        if (shm_data) {
+            stats_update(&shm_data->stats, sems.sem_stats, 200, cached_size);
+        }
+        
         return;
     }
+
+    // Cache miss - no specific tracking needed, just counted in final stats
 
     int file_fd = open(fullpath, O_RDONLY);
     printf("[SERVE] open() file_fd=%d\n", file_fd);
@@ -245,10 +269,19 @@ static void serve_file(int fd, const char *fullpath) {
 
         char buf[4096];
         ssize_t n;
-        while ((n = read(file_fd, buf, sizeof(buf))) > 0)
+        size_t total_sent = 0;
+        while ((n = read(file_fd, buf, sizeof(buf))) > 0) {
             send(fd, buf, n, 0);
+            total_sent += n;
+        }
 
         close(file_fd);
+        
+        // Update stats
+        if (shm_data) {
+            stats_update(&shm_data->stats, sems.sem_stats, 200, total_sent);
+        }
+        
         return;
     }
 
@@ -264,6 +297,11 @@ static void serve_file(int fd, const char *fullpath) {
     send(fd, file_data, st.st_size, 0);
 
     cache_put(fullpath, file_data, st.st_size);
+
+    // Update stats - successful file served (status 200)
+    if (shm_data) {
+        stats_update(&shm_data->stats, sems.sem_stats, 200, st.st_size);
+    }
 
     free(file_data);
 }
