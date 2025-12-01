@@ -2,7 +2,10 @@
 #include <semaphore.h>
 #include "stats.h"
 
-// Inicializa a estrutura a zeros
+/**
+ * @brief Inicializa a estrutura de estatísticas a zero.
+ * @param stats Ponteiro para a estrutura de estatísticas a inicializar.
+ */
 void stats_init(server_stats_t *stats) {
     if (stats) {
         stats->total_requests = 0;
@@ -16,7 +19,14 @@ void stats_init(server_stats_t *stats) {
     }
 }
 
-// Atualiza contadores de forma segura (Thread-Safe & Process-Safe)
+/**
+ * @brief Atualiza os contadores de estatísticas de forma segura (thread-safe e process-safe).
+ * @param stats Ponteiro para a estrutura de estatísticas.
+ * @param mutex Semáforo para proteção da secção crítica.
+ * @param status_code Código de estado HTTP do pedido.
+ * @param bytes Número de bytes transferidos neste pedido.
+ */
+
 void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long bytes) {
     if (!stats || !mutex) return;
 
@@ -38,6 +48,11 @@ void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long byt
     sem_post(mutex); // [cite: 168]
 }
 
+/**
+ * @brief Incrementa o número de conexões ativas de forma segura.
+ * @param stats Ponteiro para a estrutura de estatísticas.
+ * @param mutex Semáforo para proteção da secção crítica.
+ */
 void stats_connection_start(server_stats_t *stats, sem_t *mutex) {
     if (!stats || !mutex) return;
     sem_wait(mutex);
@@ -45,6 +60,11 @@ void stats_connection_start(server_stats_t *stats, sem_t *mutex) {
     sem_post(mutex);
 }
 
+/**
+ * @brief Decrementa o número de conexões ativas de forma segura.
+ * @param stats Ponteiro para a estrutura de estatísticas.
+ * @param mutex Semáforo para proteção da secção crítica.
+ */
 void stats_connection_end(server_stats_t *stats, sem_t *mutex) {
     if (!stats || !mutex) return;
     sem_wait(mutex);
@@ -52,6 +72,11 @@ void stats_connection_end(server_stats_t *stats, sem_t *mutex) {
     sem_post(mutex);
 }
 
+/**
+ * @brief Imprime as estatísticas atuais de forma segura.
+ * @param stats Ponteiro para a estrutura de estatísticas.
+ * @param mutex Semáforo para proteção da secção crítica.
+ */
 void stats_print(server_stats_t *stats, sem_t *mutex) {
     if (!stats || !mutex) return;
     
