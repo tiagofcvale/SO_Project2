@@ -211,10 +211,11 @@ static void send_error_page(int fd, int code, const char* msg) {
  * @brief Serve um ficheiro ao cliente, usando a cache se possível.
  * @param fd Descritor do socket do cliente.
  * @param fullpath Caminho absoluto do ficheiro a servir.
+ * @param is_head Se 1, envia apenas headers (método HEAD), se 0 envia body também (GET).
  */
-static void serve_file(int fd, const char *fullpath) {
+static void serve_file(int fd, const char *fullpath, int is_head) {
 
-    printf("[SERVE] fullpath='%s'\n", fullpath);
+    printf("[SERVE] fullpath='%s', is_head=%d\n", fullpath, is_head);
 
     char* cached_data = NULL;
     size_t cached_size = 0;
@@ -234,7 +235,11 @@ static void serve_file(int fd, const char *fullpath) {
         );
 
         send(fd, header, h, 0);
-        send(fd, cached_data, cached_size, 0);
+        
+        // Se for HEAD, não enviamos o body
+        if (!is_head) {
+            send(fd, cached_data, cached_size, 0);
+        }
         
         // Update stats - cache hit! (status 200)
         if (shm_data) {
@@ -276,6 +281,15 @@ static void serve_file(int fd, const char *fullpath) {
 
 
     send(fd, header, h, 0);
+
+    // Se for HEAD, não enviamos o body
+    if (is_head) {
+        close(file_fd);
+        if (shm_data) {
+            stats_update(&shm_data->stats, sems.sem_stats, 200, 0);
+        }
+        return;
+    }
 
     printf("[SERVE] ficheiro enviado (%ld bytes)\n", st.st_size);
 
@@ -347,7 +361,13 @@ void http_handle_request(int client_socket) {
         return;
     }
 
-    if (strcmp(req.method, "GET") != 0) {
+    // Suportar GET e HEAD
+    int is_head = 0;
+    if (strcmp(req.method, "GET") == 0) {
+        is_head = 0;
+    } else if (strcmp(req.method, "HEAD") == 0) {
+        is_head = 1;
+    } else {
         send_error_page(client_socket, 501, "Not Implemented");
         logger_log(req.client_ip, req.method, req.path, 501, 0);
         close(client_socket);
@@ -360,6 +380,9 @@ void http_handle_request(int client_socket) {
     char fullpath[1024];
     snprintf(fullpath, sizeof(fullpath), "%s%s",
              get_document_root(), req.path);
+
+    // DEBUG: Mostrar o caminho completo do ficheiro procurado
+    printf("DEBUG: Procurando ficheiro: %s\n", fullpath);
 
     struct stat st;
     if (stat(fullpath, &st) < 0) {
@@ -376,7 +399,7 @@ void http_handle_request(int client_socket) {
         return;
     }
 
-    serve_file(client_socket, fullpath);
+    serve_file(client_socket, fullpath, is_head);
     logger_log(req.client_ip, req.method, req.path, 200, st.st_size);
 
     close(client_socket);

@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "master.h"
 #include "config.h"
@@ -139,5 +140,15 @@ int master_start(void) {
         stats_print(&shm_data->stats, sems.sem_stats);
     }
 
+    return 0;
+}
+
+/**
+ * @brief Para o servidor de forma ordenada (função opcional para interface)
+ * @return 0 em sucesso
+ */
+int master_stop(void) {
+    // Trigger do shutdown via sinal
+    raise(SIGINT);
     return 0;
 }

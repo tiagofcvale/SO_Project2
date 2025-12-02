@@ -39,11 +39,13 @@ int main(void) {
     // 4. Iniciar o Mestre (Cria SHM, Semáforos, Sockets e Workers)
     if (master_start() != 0) {
         fprintf(stderr, "Erro crítico a iniciar servidor.\n");
+        cache_cleanup();
         logger_cleanup();
         return 1;
     }
 
     // Limpeza final (só chega aqui se o master retornar, o que não deve acontecer em loop)
+    cache_cleanup();
     logger_cleanup();
     return 0;
 }

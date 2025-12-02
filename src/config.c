@@ -114,6 +114,14 @@ int load_config(const char *filename) {
 
 
 /**
+ * @brief Obtém ponteiro para toda a estrutura de configuração.
+ * @return Ponteiro constante para a configuração do servidor.
+ */
+const server_config_t *get_config(void) {
+    return &config;
+}
+
+/**
  * @brief Obtém o número da porta do servidor.
  * @return Porta TCP configurada.
  */

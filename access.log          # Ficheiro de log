@@ -1,0 +1,60 @@
+===== Servidor iniciado =====
+[2025-12-02 19:19:23] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 19:19:23] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 19:19:25] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 19:19:31] 127.0.0.1 "GET /index.html" 404 0
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 19:21:16] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 19:21:21] 127.0.0.1 "GET /index.html" 404 0
+===== Servidor desligado =====
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 19:35:29] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 19:37:16] 127.0.0.1 "GET /index.html" 404 0
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 19:45:43] 127.0.0.1 "GET ./index.html" 404 0
+[2025-12-02 19:45:44] 127.0.0.1 "GET ./index.html" 404 0
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 19:47:43] 127.0.0.1 "GET ./www/index.html" 404 0
+===== Servidor iniciado =====
+===== Servidor desligado =====
+===== Servidor iniciado =====
+===== Servidor desligado =====
+===== Servidor iniciado =====
+===== Servidor desligado =====
+===== Servidor iniciado =====
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 19:50:35] 127.0.0.1 "GET ./index.html" 404 0
+[2025-12-02 19:50:35] 127.0.0.1 "GET ./index.html" 404 0
+[2025-12-02 19:51:07] 127.0.0.1 "GET ./index.html" 404 0
+[2025-12-02 19:51:10] 127.0.0.1 "GET ./index.html" 404 0
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 19:51:17] 127.0.0.1 "GET ./test.html" 404 0
+[2025-12-02 19:51:27] 127.0.0.1 "GET ./test.html" 404 0
+[2025-12-02 19:51:28] 127.0.0.1 "GET ./test.html" 404 0
+[2025-12-02 19:51:34] 127.0.0.1 "GET ./test.html" 404 0
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 19:51:42] 127.0.0.1 "GET /www/test.html" 404 0
+[2025-12-02 19:53:43] 127.0.0.1 "GET /www/test.html" 404 0
+[2025-12-02 19:53:49] 127.0.0.1 "GET /www/test.html" 404 0
+[2025-12-02 19:55:19] 127.0.0.1 "GET /www/test.html" 404 0
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 20:00:19] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 20:00:20] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 20:00:20] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 20:00:22] 127.0.0.1 "GET /index.html" 404 0
+[2025-12-02 20:00:23] 127.0.0.1 "GET /index.html" 404 0
+===== Servidor desligado =====
+===== Servidor iniciado =====
+[2025-12-02 20:02:15] 127.0.0.1 "GET /index.html" 200 118
+[2025-12-02 20:02:15] 127.0.0.1 "GET /test.css" 200 0
+[2025-12-02 20:02:15] 127.0.0.1 "GET /test.js" 200 0
+[2025-12-02 20:02:15] 127.0.0.1 "GET /test.png" 200 420116
+===== Servidor desligado =====
