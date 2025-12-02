@@ -9,6 +9,10 @@
 
 #include "shared_mem.h"
 
+/**
+ * @brief Cria ou abre um objeto de memória partilhada POSIX e faz o seu mapeamento.
+ * @return Ponteiro para a memória partilhada mapeada, ou NULL em caso de erro.
+ */
 shared_data_t* shm_create(void) {
     // 1. Criar/Abrir objeto de memória partilhada POSIX
     int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
@@ -39,6 +43,10 @@ shared_data_t* shm_create(void) {
     return ptr;
 }
 
+/**
+ * @brief Liberta o mapeamento da memória partilhada e remove o objeto do sistema operativo.
+ * @param data Ponteiro para a memória partilhada a desmapear.
+ */
 void shm_destroy(shared_data_t* data) {
     if (data) {
         // Desmapear a memória do processo

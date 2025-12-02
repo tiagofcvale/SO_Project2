@@ -31,7 +31,7 @@ void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long byt
     if (!stats || !mutex) return;
 
     // Entrar na secção crítica (Bloqueia outros processos)
-    sem_wait(mutex); // [cite: 168]
+    sem_wait(mutex);
 
     stats->total_requests++;
     stats->bytes_transferred += bytes;
@@ -45,7 +45,7 @@ void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long byt
     }
 
     // Sair da secção crítica (Liberta para outros processos)
-    sem_post(mutex); // [cite: 168]
+    sem_post(mutex);
 }
 
 /**

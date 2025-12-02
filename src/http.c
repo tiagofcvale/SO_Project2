@@ -24,9 +24,11 @@
 extern shared_data_t* shm_data;
 extern ipc_semaphores_t sems;
 
-// ------------------------------------------------------------
-// MIME types
-// ------------------------------------------------------------
+/**
+ * @brief Devolve o MIME type apropriado para um ficheiro com base na extensão.
+ * @param path Caminho do ficheiro.
+ * @return String com o MIME type correspondente.
+ */
 static const char* mime_from_path(const char* path) {
 
     const char* ext = strrchr(path, '.');
@@ -50,9 +52,13 @@ static const char* mime_from_path(const char* path) {
 }
 
 
-// ------------------------------------------------------------
-// read_line — lê linha sem bloquear
-// ------------------------------------------------------------
+/**
+ * @brief Lê uma linha do socket sem bloquear, até '\n' ou atingir o máximo.
+ * @param fd Descritor do socket.
+ * @param buf Buffer de destino para a linha lida.
+ * @param max Tamanho máximo do buffer.
+ * @return Número de bytes lidos, ou -1 em caso de erro.
+ */
 static int read_line(int fd, char* buf, int max) {
     int i = 0;
     char c;
@@ -86,9 +92,12 @@ static int read_line(int fd, char* buf, int max) {
 }
 
 
-// ------------------------------------------------------------
-// parse_request — separa método, caminho, headers
-// ------------------------------------------------------------
+/**
+ * @brief Faz o parsing do pedido HTTP, separando método, caminho e headers.
+ * @param client_fd Descritor do socket do cliente.
+ * @param req Estrutura onde os dados do pedido serão guardados.
+ * @return 0 em caso de sucesso, -1 em caso de erro.
+ */
 static int parse_request(int client_fd, http_request_t* req) {
     char line[MAX_REQ_LINE];
 
@@ -126,9 +135,13 @@ static int parse_request(int client_fd, http_request_t* req) {
 
 
 
-// ------------------------------------------------------------
-// send_error_page
-// ------------------------------------------------------------
+
+/**
+ * @brief Envia uma página de erro HTTP personalizada ou genérica para o cliente.
+ * @param fd Descritor do socket do cliente.
+ * @param code Código de erro HTTP (ex: 404, 500).
+ * @param msg Mensagem associada ao erro.
+ */
 static void send_error_page(int fd, int code, const char* msg) {
 
     char errpath[256];
@@ -193,9 +206,12 @@ static void send_error_page(int fd, int code, const char* msg) {
 }
 
 
-// ------------------------------------------------------------
-// serve_file — tenta cache primeiro
-// ------------------------------------------------------------
+
+/**
+ * @brief Serve um ficheiro ao cliente, usando a cache se possível.
+ * @param fd Descritor do socket do cliente.
+ * @param fullpath Caminho absoluto do ficheiro a servir.
+ */
 static void serve_file(int fd, const char *fullpath) {
 
     printf("[SERVE] fullpath='%s'\n", fullpath);
@@ -307,9 +323,11 @@ static void serve_file(int fd, const char *fullpath) {
 }
 
 
-// ------------------------------------------------------------
-// http_handle_request
-// ------------------------------------------------------------
+/**
+ * @brief Função principal para tratar um pedido HTTP de um cliente.
+ *        Faz parsing, validação, serve ficheiros e regista logs e estatísticas.
+ * @param client_socket Descritor do socket do cliente.
+ */
 void http_handle_request(int client_socket) {
 
     printf("[HTTP] Entrou no http_handle_request com socket %d\n", client_socket);

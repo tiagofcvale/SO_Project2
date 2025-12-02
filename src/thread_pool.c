@@ -6,9 +6,11 @@
 #include "thread_pool.h"
 #include "http.h"
 
-// --------------------------------------------------------------
-// queue_pop — usado pelas threads do worker (consumidores)
-// --------------------------------------------------------------
+/**
+ * @brief Remove e retorna um socket da fila de trabalho (consumidor).
+ * @param pool Ponteiro para o pool de threads.
+ * @return Descritor de socket retirado da fila.
+ */
 static int queue_pop(thread_pool_t *pool) {
     thread_pool_queue_t *q = &pool->queue;
 
@@ -27,9 +29,11 @@ static int queue_pop(thread_pool_t *pool) {
     return fd;
 }
 
-// --------------------------------------------------------------
-// worker_thread — função executada por cada thread do worker
-// --------------------------------------------------------------
+/**
+ * @brief Função executada por cada thread do pool.
+ * @param arg Ponteiro para o pool de threads (thread_pool_t*).
+ * @return NULL (nunca retorna normalmente).
+ */
 static void *worker_thread(void *arg) {
     thread_pool_t *pool = arg;
 
@@ -39,15 +43,17 @@ static void *worker_thread(void *arg) {
         printf("  [Thread %ld] Recebi socket %d\n",
                pthread_self(), client_socket);
 
-        http_handle_request(client_socket);   // TRATAR PEDIDO HTTP
+        http_handle_request(client_socket);   
     }
 
     return NULL;
 }
 
-// --------------------------------------------------------------
-// thread_pool_add — produtores (worker.c) inserem socket na fila
-// --------------------------------------------------------------
+/**
+ * @brief Adiciona um socket à fila de trabalho (produtor).
+ * @param pool Ponteiro para o pool de threads.
+ * @param client_socket Descritor de socket a adicionar à fila.
+ */
 void thread_pool_add(thread_pool_t *pool, int client_socket) {
     thread_pool_queue_t *q = &pool->queue;
 
@@ -64,9 +70,11 @@ void thread_pool_add(thread_pool_t *pool, int client_socket) {
     pthread_mutex_unlock(&q->mutex);
 }
 
-// --------------------------------------------------------------
-// thread_pool_init — cria fila interna e threads do worker
-// --------------------------------------------------------------
+/**
+ * @brief Inicializa o pool de threads e a fila interna.
+ * @param pool Ponteiro para o pool de threads a inicializar.
+ * @param n Número de threads a criar no pool.
+ */
 void thread_pool_init(thread_pool_t *pool, int n) {
 
     // Inicializar queue interna

@@ -8,6 +8,11 @@
 #include "cache.h"
 #include "master.h"
 
+/**
+ * @brief Função principal do servidor HTTP. Carrega configuração, inicializa módulos
+ *        (logger, cache) e arranca o processo master que gere os workers e recursos IPC.
+ * @return 0 em caso de sucesso, 1 em caso de erro crítico.
+ */
 int main(void) {
 
     // 1. Carregar configuração

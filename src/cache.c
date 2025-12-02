@@ -13,9 +13,12 @@ static size_t cache_count = 0;
 // Reader-Writer lock instead of simple mutex
 static pthread_rwlock_t cache_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
-// ------------------------------------------------------------
-// hash simples para mapear nomes → índices
-// ------------------------------------------------------------
+
+/**
+ * @brief Calcula um hash simples para um caminho de ficheiro.
+ * @param path Caminho do ficheiro.
+ * @return Índice hash para a tabela de cache.
+ */
 static size_t hash_path(const char *path) {
     unsigned long h = 5381;
     int c;
@@ -24,9 +27,11 @@ static size_t hash_path(const char *path) {
     return h % cache_capacity;
 }
 
-// ------------------------------------------------------------
-// Inicializar cache com capacidade em MB
-// ------------------------------------------------------------
+
+/**
+ * @brief Inicializa a cache em memória com a capacidade indicada (em MB).
+ * @param mb Tamanho da cache em megabytes.
+ */
 void cache_init(int mb) {
     size_t bytes = (size_t)mb * 1024 * 1024;
     
@@ -45,9 +50,14 @@ void cache_init(int mb) {
            cache_capacity, mb);
 }
 
-// ------------------------------------------------------------
-// Verificar se ficheiro está em cache (READ operation)
-// ------------------------------------------------------------
+
+/**
+ * @brief Verifica se um ficheiro está em cache e, se sim, devolve os dados.
+ * @param path Caminho do ficheiro a procurar.
+ * @param data Ponteiro para onde será guardado o ponteiro para os dados.
+ * @param size Ponteiro para onde será guardado o tamanho dos dados.
+ * @return 1 se encontrado, 0 caso contrário.
+ */
 int cache_get(const char *path, char **data, size_t *size) {
     // Acquire READ lock - multiple threads can read simultaneously
     pthread_rwlock_rdlock(&cache_rwlock);
@@ -72,9 +82,13 @@ int cache_get(const char *path, char **data, size_t *size) {
     return 1;
 }
 
-// ------------------------------------------------------------
-// Inserir ficheiro na cache (WRITE operation)
-// ------------------------------------------------------------
+
+/**
+ * @brief Insere ou atualiza um ficheiro na cache.
+ * @param path Caminho do ficheiro.
+ * @param data Ponteiro para os dados a guardar.
+ * @param size Tamanho dos dados.
+ */
 void cache_put(const char *path, char *data, size_t size) {
     // Acquire WRITE lock - exclusive access for writing
     pthread_rwlock_wrlock(&cache_rwlock);
@@ -97,9 +111,10 @@ void cache_put(const char *path, char *data, size_t size) {
     pthread_rwlock_unlock(&cache_rwlock);
 }
 
-// ------------------------------------------------------------
-// Cleanup cache (optional but good practice)
-// ------------------------------------------------------------
+
+/**
+ * @brief Liberta toda a memória associada à cache e destrói o lock.
+ */
 void cache_cleanup(void) {
     pthread_rwlock_wrlock(&cache_rwlock);
 

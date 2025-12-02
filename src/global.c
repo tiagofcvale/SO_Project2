@@ -1,5 +1,5 @@
 #include "global.h"
 
-// Variáveis globais (se precisares no futuro)
+// Variáveis globais
 
 int GLOBAL_DEBUG_MODE = 0;

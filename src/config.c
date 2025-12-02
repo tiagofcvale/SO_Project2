@@ -5,9 +5,7 @@
 
 #include "config.h"
 
-// ------------------------------------------------------------
-// Configuração por defeito
-// ------------------------------------------------------------
+// Configuração do servidor
 static server_config_t config = {
     .port = 8080,
     .document_root = "www",
@@ -20,9 +18,12 @@ static server_config_t config = {
 };
 
 
-// ------------------------------------------------------------
-// trim() — remover espaços
-// ------------------------------------------------------------
+
+/**
+ * @brief Remove espaços em branco do início e fim de uma string.
+ * @param str String a ser processada.
+ * @return Ponteiro para a string sem espaços nas extremidades.
+ */
 static char *trim(char *str) {
     char *end;
 
@@ -41,9 +42,12 @@ static char *trim(char *str) {
 }
 
 
-// ------------------------------------------------------------
-// load_config() — ler ficheiro server.conf
-// ------------------------------------------------------------
+
+/**
+ * @brief Lê o ficheiro de configuração e atualiza os parâmetros do servidor.
+ * @param filename Nome do ficheiro de configuração.
+ * @return 0 em caso de sucesso (ou ficheiro não encontrado), -1 em caso de erro grave.
+ */
 int load_config(const char *filename) {
 
     FILE *file = fopen(filename, "r");
@@ -108,37 +112,67 @@ int load_config(const char *filename) {
 }
 
 
-// ------------------------------------------------------------
-// Getters
-// ------------------------------------------------------------
+
+/**
+ * @brief Obtém o número da porta do servidor.
+ * @return Porta TCP configurada.
+ */
 int get_server_port(void) {
     return config.port;
 }
 
+/**
+ * @brief Obtém o diretório raiz dos documentos a servir.
+ * @return String com o caminho do document root.
+ */
 const char *get_document_root(void) {
     return config.document_root;
 }
 
+/**
+ * @brief Obtém o número de processos worker configurados.
+ * @return Número de workers.
+ */
 int get_num_workers(void) {
     return config.num_workers;
 }
 
+/**
+ * @brief Obtém o número de threads por worker.
+ * @return Número de threads por worker.
+ */
 int get_threads_per_worker(void) {
     return config.threads_per_worker;
 }
 
+/**
+ * @brief Obtém o tamanho máximo da fila de pedidos.
+ * @return Tamanho da fila.
+ */
 int get_max_queue_size(void) {
     return config.max_queue_size;
 }
 
+/**
+ * @brief Obtém o nome do ficheiro de log.
+ * @return String com o nome do ficheiro de log.
+ */
 const char *get_log_file(void) {
     return config.log_file;
 }
 
+/**
+ * @brief Obtém o tamanho da cache em megabytes.
+ * @return Tamanho da cache em MB.
+ */
 int get_cache_size_mb(void) {
     return config.cache_size_mb;
 }
 
+/**
+ * @brief Obtém o timeout configurado para operações do servidor.
+ * @return Timeout em segundos.
+ */
 int get_timeout_seconds(void) {
     return config.timeout_seconds;
 }

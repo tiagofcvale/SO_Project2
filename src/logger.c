@@ -9,9 +9,11 @@
 static FILE *log_fp = NULL;
 
 
-// ------------------------------------------------------------
-// Inicializar logger
-// ------------------------------------------------------------
+
+/**
+ * @brief Inicializa o sistema de logging, abrindo o ficheiro de log para escrita.
+ *        Se falhar, usa stdout como fallback.
+ */
 void logger_init(void) {
 
     const char *logfile = get_log_file();
@@ -27,9 +29,15 @@ void logger_init(void) {
 }
 
 
-// ------------------------------------------------------------
-// Registar um evento no log
-// ------------------------------------------------------------
+
+/**
+ * @brief Regista um evento/acesso no log do servidor.
+ * @param ip Endereço IP do cliente.
+ * @param method Método HTTP utilizado (ex: GET, POST).
+ * @param path Caminho do recurso pedido.
+ * @param status Código de estado HTTP da resposta.
+ * @param size Número de bytes transferidos na resposta.
+ */
 void logger_log(const char *ip,
                 const char *method,
                 const char *path,
@@ -51,9 +59,10 @@ void logger_log(const char *ip,
 }
 
 
-// ------------------------------------------------------------
-// Finalizar logger
-// ------------------------------------------------------------
+
+/**
+ * @brief Finaliza o sistema de logging, fechando o ficheiro de log se necessário.
+ */
 void logger_cleanup(void) {
     if (log_fp && log_fp != stdout) {
         fprintf(log_fp, "===== Servidor desligado =====\n");

@@ -22,9 +22,11 @@ static shared_data_t *shm_data = NULL;
 static ipc_semaphores_t sems;
 static pid_t *worker_pids = NULL;
 
-// ------------------------------------------------------------
-// Enviar erro 503 se a fila estiver cheia
-// ------------------------------------------------------------
+
+/**
+ * @brief Envia uma resposta HTTP 503 e fecha o socket, usado quando a fila está cheia.
+ * @param fd Descritor de socket do cliente.
+ */
 void send_503_and_close(int fd) {
     const char *resp = "HTTP/1.1 503 Service Unavailable\r\n"
                        "Content-Type: text/plain\r\n"
@@ -34,9 +36,10 @@ void send_503_and_close(int fd) {
     close(fd);
 }
 
-// ------------------------------------------------------------
-// Handler para CTRL+C (Limpeza de IPC)
-// ------------------------------------------------------------
+/**
+ * @brief Handler para o sinal SIGINT (CTRL+C). Limpa recursos IPC, termina workers e encerra o servidor.
+ * @param sig Número do sinal recebido (não usado).
+ */
 void handle_sigint(int sig) {
     (void)sig;
     printf("\n[Master] Recebido SIGINT. A encerrar servidor...\n");
@@ -66,9 +69,11 @@ void handle_sigint(int sig) {
     exit(0);
 }
 
-// ------------------------------------------------------------
-// Função Principal do Master
-// ------------------------------------------------------------
+
+/**
+ * @brief Função principal do processo master. Inicializa IPC, socket, cria workers e monitoriza o servidor.
+ * @return 0 em caso de sucesso, -1 em caso de erro.
+ */
 int master_start(void) {
     signal(SIGINT, handle_sigint);
 

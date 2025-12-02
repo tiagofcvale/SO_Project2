@@ -10,10 +10,22 @@
 #include "shared_mem.h"
 #include "semaphores.h"
 
-// Global variables accessible to http.c
+
+/**
+ * @brief Ponteiro global para a memória partilhada, acessível por outros módulos.
+ */
 shared_data_t* shm_data = NULL;
+
+/**
+ * @brief Estrutura global com os semáforos IPC usados pelo worker.
+ */
 ipc_semaphores_t sems;
 
+/**
+ * @brief Função principal do processo worker. Liga-se à memória partilhada, abre os semáforos,
+ *        cria o pool de threads e aceita ligações de clientes, distribuindo-as pelas threads.
+ * @param listen_fd File descriptor do socket de escuta (aceita novas ligações TCP).
+ */
 void worker_main(int listen_fd) {
     // Attach to shared memory created by master
     shm_data = shm_create();
