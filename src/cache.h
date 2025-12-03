@@ -27,4 +27,7 @@ int cache_get(const char *path, char **data, size_t *size);
 // Colocar ficheiro na cache
 void cache_put(const char *path, char *data, size_t size);
 
+// Clean à cache
+void cache_cleanup(void);
+
 #endif
