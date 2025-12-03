@@ -1,188 +1,71 @@
-Web Server Multi-Threaded com IPC e Semáforos
-Servidor HTTP/1.1 multi-processo e multi-threaded implementado em C, usando memória partilhada POSIX e semáforos para sincronização entre processos.
 
-📋 Características
-✅ Arquitetura Master-Worker com múltiplos processos
-✅ Thread pool em cada worker para concorrência
-✅ Memória partilhada POSIX para comunicação entre processos
-✅ Semáforos POSIX para sincronização
-✅ Cache thread-safe com reader-writer locks
-✅ Suporte para métodos GET e HEAD
-✅ Servir ficheiros estáticos (HTML, CSS, JS, imagens)
-✅ Deteção automática de MIME types
-✅ Páginas de erro personalizadas (404, 403, 500, 503)
-✅ Sistema de logging thread-safe
-✅ Estatísticas em tempo real
-✅ Configuração via ficheiro
-🚀 Quick Start
-Compilar
-bash
-make
-Executar
-bash
-./server
-O servidor iniciará na porta 8080 (configurável em server.conf).
+# Multi-Threaded Web Server with IPC and Semaphores
 
-Testar
-Em outro terminal:
+## Author 
 
-bash
-# Testar no browser
-firefox http://localhost:8080/
+Bernardo Mota Coelho 
+125059
 
-# Ou com curl
-curl http://localhost:8080/
+Tiago Francisco Crespo do Vale
+125913
 
-# Executar suite de testes
-./test_server.sh
-Parar o Servidor
-Pressione CTRL+C no terminal onde o servidor está a correr. O servidor fará shutdown gracefully, limpando todos os recursos IPC.
+## Description
 
-📁 Estrutura do Projeto
-.
-├── main.c              # Ponto de entrada
-├── master.c/h          # Processo master (gestão de workers)
-├── worker.c/h          # Processos worker (thread pools)
-├── http.c/h            # Handling de HTTP requests/responses
-├── thread_pool.c/h     # Gestão de thread pools
-├── cache.c/h           # Sistema de cache thread-safe
-├── logger.c/h          # Sistema de logging
-├── stats.c/h           # Estatísticas do servidor
-├── config.c/h          # Parser de configuração
-├── shared_mem.c/h      # Gestão de memória partilhada
-├── semaphores.c/h      # Gestão de semáforos POSIX
-├── Makefile            # Sistema de build
-├── server.conf         # Ficheiro de configuração
-├── test_server.sh      # Script de testes
-└── www/                # Diretório root dos ficheiros web
-    ├── index.html
-    ├── test.html
-    └── errors/
-        ├── 404.html
-        ├── 403.html
-        ├── 500.html
-        └── 503.html
-⚙️ Configuração
-Edite server.conf para alterar parâmetros:
+This project implements a multi-threaded HTTP server in C, using POSIX shared memory and semaphores for inter-process communication (IPC) and synchronization. It follows a master-worker architecture with worker processes handling requests using thread pools, allowing for efficient, concurrent request processing.
 
-ini
-PORT=8080                    # Porta TCP
-DOCUMENT_ROOT=www            # Diretório root
-NUM_WORKERS=4                # Número de processos worker
-THREADS_PER_WORKER=10        # Threads por worker
-MAX_QUEUE_SIZE=100           # Tamanho da fila de conexões
-LOG_FILE=access.log          # Ficheiro de log
-CACHE_SIZE_MB=10             # Tamanho da cache (MB)
-TIMEOUT_SECONDS=30           # Timeout
-🏗️ Arquitetura
-Hierarquia de Processos
-Master Process
-├── Accept conexões TCP
-├── Gere workers
-└── Monitoriza estatísticas
-    │
-    ├── Worker 1
-    │   ├── Thread 1
-    │   ├── Thread 2
-    │   ├── ...
-    │   └── Thread N
-    │
-    ├── Worker 2
-    │   └── (mesma estrutura)
-    │
-    └── Worker N...
-Mecanismos IPC
-Memória Partilhada (POSIX shm)
-Fila de conexões (circular buffer)
-Estatísticas globais
-Flags de controlo
-Semáforos POSIX Nomeados
-sem_empty: Slots vazios na fila
-sem_full: Slots cheios na fila
-sem_mutex: Exclusão mútua para acesso à fila
-sem_stats: Proteção das estatísticas
-sem_log: Proteção do ficheiro de log
-Reader-Writer Locks (pthread_rwlock)
-Cache de ficheiros thread-safe
-Múltiplos leitores simultâneos
-Escritores com acesso exclusivo
-🧪 Testes
-Testes Básicos
-bash
-make test
-Teste de Carga
-bash
-# Requer apache2-utils
-sudo apt-get install apache2-utils
+## Instalation
 
-# 1000 requests, 50 concorrentes
-make loadtest
-Verificar Memory Leaks
-bash
-make valgrind
-Verificar Race Conditions
-bash
-make helgrind
-🔧 Comandos Make
-Comando	Descrição
-make ou make all	Compila o servidor
-make run	Compila e executa
-make test	Testes básicos
-make loadtest	Teste de carga
-make valgrind	Verifica memory leaks
-make helgrind	Verifica race conditions
-make clean	Remove objetos e executável
-make distclean	Limpeza completa (inclui IPC)
-make help	Mostra ajuda
-📊 Estatísticas
-O servidor imprime estatísticas a cada 5 segundos e no shutdown:
+If repository is online and public: 
 
-=== Estatísticas ===
-Pedidos Totais: 500
-Bytes:          25600
-Ativos:         4
-====================
-🐛 Debugging
-Verificar Recursos IPC Órfãos
-bash
-# Memória partilhada
-ls -l /dev/shm/webserver_*
+- type on terminal: git clone https://github.com/tiagofcvale/SO_Project2
 
-# Remover manualmente se necessário
-rm /dev/shm/webserver_shm_v1
+- type on terminal: cd SO_Project2
 
-# Semáforos
-ls -l /dev/shm/sem.sem_ws_*
-Monitorizar Conexões
-bash
-watch -n 1 'netstat -an | grep :8080'
-Ver Árvore de Processos
-bash
-pstree -p $(pgrep -f ./server)
-🔒 Segurança
-Validação de paths (previne directory traversal)
-Tratamento de buffer overflows
-Verificação de permissões de ficheiros
-Gestão segura de recursos
-📝 Logs
-O servidor gera logs no formato Apache Combined:
+If repository is in .rar or .zip:
 
-[2025-12-02 14:30:15] 127.0.0.1 "GET /index.html" 200 1234
-[2025-12-02 14:30:16] 127.0.0.1 "GET /test.css" 200 567
-⚠️ Limitações Conhecidas
-Apenas métodos GET e HEAD
-Sem suporte para HTTPS/TLS
-Sem autenticação
-Sem keep-alive (Connection: close)
-Sem chunked transfer encoding
-📚 Requisitos
-SO: Linux (Ubuntu 20.04+ recomendado)
-Compiler: GCC 9.0+
-Libraries: pthread, rt (realtime)
-Ferramentas: make, curl (para testes)
-🤝 Contribuição
-Trabalho académico para a disciplina de Sistemas Operativos 2025/2026.
+- download the files, unzip and type on terminal: cd SO_Project2
 
-📄 Licença
-Projeto académico - ver guiões do projeto para detalhes.
+## Usage 
+
+- type on terminal: make
+
+- type on terminal: ./server
+
+
+To stop the server, press CTRL+C in the terminal where the server is running. The server will shut down gracefully, cleaning up all IPC resources.
+
+
+## Features
+
+ - Multi-process and Multi-threaded Architecture: A master process that manages worker      processes, with each worker running a thread pool to handle incoming HTTP requests concurrently.
+
+- Inter-Process Communication (IPC): Shared memory is used for communication between processes, while semaphores ensure synchronization and avoid race conditions.
+
+- HTTP/1.1 Protocol Support: Supports GET and HEAD requests, static file serving (HTML, CSS, JS, images), and custom error pages (404, 403, 500, 503).
+
+- Thread-Safe Operations: Implemented using mutexes and condition variables for thread synchronization, ensuring thread safety for resources such as logs, statistics, and file cache.
+
+- Logging System: A thread-safe logging mechanism that records every HTTP request and error.
+
+- Statistics: Tracks the number of requests served, bytes transferred, and response times.
+
+- Cache Management: A thread-safe LRU (Least Recently Used) cache to store frequently accessed files.
+
+- Graceful Shutdown: Uses signal handling to ensure that resources are cleaned up properly when the server shuts down.
+
+Optional or advanced features:
+
+## Configuration 
+
+The server starts on port 8080 (configurable in server.conf).
+
+## Examples 
+
+
+
+## References 
+
+* [W3Schools](https://www.w3schools.com/)
+* [Stack Overflow](https://stackoverflow.com/questions)
+* [Modern Operating Systems 4th Edition - Tanenbaum & Bos] https://csc-knu.github.io/sys-prog/books/Andrew%20S.%20Tanenbaum%20-%20Modern%20Operating%20Systems.pdf
 
