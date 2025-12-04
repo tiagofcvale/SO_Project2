@@ -8,22 +8,46 @@ Tiago Francisco Crespo do Vale
 ### Test Case 1: Test GET requests for HTML, CSS & JS
 
 *Steps:**
-1. Add html, css and javascript files to www folder
+1. Add HTML, CSS and JavaScript files to `www` folder
 2. Run: `make`
 3. Run: `./server`
-4. Verify on http://localhost:8080/name_of_your_html.html
-5. Verify if all the components work
+4. Access: `http://localhost:8080/name_of_your_html.html`
+5. Verify that all components are working correctly.
 
 **Expected Result:**
-- The files can be added successful to the right folder
-- http://localhost:8080/name_of_your_html.html works successfully
+- The files are successfully added to the correct folder
+- The URL `http://localhost:8080/name_of_your_html.html` should work correctly.
 
 
 **Actual Result:** 
-- A site appears
+- A website appears
 
 **Status:** x Pass ☐ Fail
 
 **Screenshots:** 
 
 ![TestCase1](/screenshots/testingitw.png)
+
+
+### Test Case 2: Test GET requests for images
+
+*Steps:**
+1. Add a image to `www/images` folder
+2. Run: `make`
+3. Run: `./server`
+4. Access: `http://localhost:8080/images/name_of_your_image`
+5. Verify that image is showing correctly.
+
+**Expected Result:**
+- The image is successfully added to the correct folder
+- The URL `http://localhost:8080/images/name_of_your_image` should work correctly.
+
+
+**Actual Result:** 
+- A image appears
+
+**Status:** x Pass ☐ Fail
+
+**Screenshots:** 
+
+![TestCase1](/screenshots/testingimage.png)
