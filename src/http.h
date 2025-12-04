@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-// Estrutura com os campos relevantes do pedido HTTP
+// Structure with the relevant fields of the HTTP request
 typedef struct {
     char method[8];
     char path[1024];
@@ -17,7 +17,7 @@ typedef struct {
 } http_request_t;
 
 
-// Função principal chamada pelas threads de cada worker
+// Main function called by each worker thread
 void http_handle_request(int client_socket);
 
 #endif

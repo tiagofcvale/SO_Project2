@@ -2,7 +2,7 @@
 #define CONFIG_H
 
 // ------------------------------------------------------------
-// Estrutura da configuração do servidor
+// Server configuration structure
 // ------------------------------------------------------------
 typedef struct {
     int port;
@@ -20,13 +20,13 @@ typedef struct {
 // API
 // ------------------------------------------------------------
 
-// Carregar configurações do ficheiro server.conf
+// Load configuration from server.conf file
 int load_config(const char *filename);
 
-// Obter ponteiro para toda a estrutura
+// Get pointer to the entire structure
 const server_config_t *get_config(void);
 
-// Getters individuais
+// Individual getters
 int get_server_port(void);
 const char *get_document_root(void);
 int get_num_workers(void);

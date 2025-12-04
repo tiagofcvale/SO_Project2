@@ -5,7 +5,7 @@
 
 #include "config.h"
 
-// Configuração do servidor
+// Server configuration
 static server_config_t config = {
     .port = 8080,
     .document_root = "www",
@@ -20,9 +20,9 @@ static server_config_t config = {
 
 
 /**
- * @brief Remove espaços em branco do início e fim de uma string.
- * @param str String a ser processada.
- * @return Ponteiro para a string sem espaços nas extremidades.
+ * @brief Removes whitespace from the beginning and end of a string.
+ * @param str String to be processed.
+ * @return Pointer to the trimmed string.
  */
 static char *trim(char *str) {
     char *end;
@@ -44,15 +44,15 @@ static char *trim(char *str) {
 
 
 /**
- * @brief Lê o ficheiro de configuração e atualiza os parâmetros do servidor.
- * @param filename Nome do ficheiro de configuração.
- * @return 0 em caso de sucesso (ou ficheiro não encontrado), -1 em caso de erro grave.
+ * @brief Reads the configuration file and updates the server parameters.
+ * @param filename Name of the configuration file.
+ * @return 0 on success (or file not found), -1 on fatal error.
  */
 int load_config(const char *filename) {
 
     FILE *file = fopen(filename, "r");
     if (!file) {
-        printf("Config file '%s' não encontrado, a usar defaults.\n", filename);
+        printf("Config file '%s' not found, using defaults.\n", filename);
         return 0;
     }
 
@@ -69,7 +69,7 @@ int load_config(const char *filename) {
 
         char *value = strchr(t, '=');
         if (!value) {
-            printf("Linha %d inválida: %s\n", line_num, t);
+            printf("Invalid line %d: %s\n", line_num, t);
             continue;
         }
 
@@ -104,7 +104,7 @@ int load_config(const char *filename) {
             config.timeout_seconds = atoi(value);
 
         else
-            printf("Opção desconhecida na linha %d: %s\n", line_num, key);
+            printf("Unknown option on line %d: %s\n", line_num, key);
     }
 
     fclose(file);
@@ -114,72 +114,72 @@ int load_config(const char *filename) {
 
 
 /**
- * @brief Obtém ponteiro para toda a estrutura de configuração.
- * @return Ponteiro constante para a configuração do servidor.
+ * @brief Gets a pointer to the entire configuration structure.
+ * @return Constant pointer to the server configuration.
  */
 const server_config_t *get_config(void) {
     return &config;
 }
 
 /**
- * @brief Obtém o número da porta do servidor.
- * @return Porta TCP configurada.
+ * @brief Gets the server port number.
+ * @return Configured TCP port.
  */
 int get_server_port(void) {
     return config.port;
 }
 
 /**
- * @brief Obtém o diretório raiz dos documentos a servir.
- * @return String com o caminho do document root.
+ * @brief Gets the document root directory to serve.
+ * @return String with the document root path.
  */
 const char *get_document_root(void) {
     return config.document_root;
 }
 
 /**
- * @brief Obtém o número de processos worker configurados.
- * @return Número de workers.
+ * @brief Gets the number of configured worker processes.
+ * @return Number of workers.
  */
 int get_num_workers(void) {
     return config.num_workers;
 }
 
 /**
- * @brief Obtém o número de threads por worker.
- * @return Número de threads por worker.
+ * @brief Gets the number of threads per worker.
+ * @return Number of threads per worker.
  */
 int get_threads_per_worker(void) {
     return config.threads_per_worker;
 }
 
 /**
- * @brief Obtém o tamanho máximo da fila de pedidos.
- * @return Tamanho da fila.
+ * @brief Gets the maximum request queue size.
+ * @return Queue size.
  */
 int get_max_queue_size(void) {
     return config.max_queue_size;
 }
 
 /**
- * @brief Obtém o nome do ficheiro de log.
- * @return String com o nome do ficheiro de log.
+ * @brief Gets the log file name.
+ * @return String with the log file name.
  */
 const char *get_log_file(void) {
     return config.log_file;
 }
 
 /**
- * @brief Obtém o tamanho da cache em megabytes.
- * @return Tamanho da cache em MB.
+ * @brief Gets the cache size in megabytes.
+ * @return Cache size in MB.
  */
 int get_cache_size_mb(void) {
     return config.cache_size_mb;
 }
 
 /**
- * @brief Obtém o timeout configurado para operações do servidor.
- * @return Timeout em segundos.
+ * @brief Gets the configured timeout for server operations.
+ * @return Timeout in seconds.
  */
 int get_timeout_seconds(void) {
     return config.timeout_seconds;

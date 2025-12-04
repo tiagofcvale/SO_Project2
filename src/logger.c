@@ -11,8 +11,8 @@ static FILE *log_fp = NULL;
 
 
 /**
- * @brief Inicializa o sistema de logging, abrindo o ficheiro de log para escrita.
- *        Se falhar, usa stdout como fallback.
+ * @brief Initializes the logging system, opening the log file for writing.
+ *        If it fails, uses stdout as a fallback.
  */
 void logger_init(void) {
 
@@ -24,19 +24,19 @@ void logger_init(void) {
         log_fp = stdout;  // fallback
     }
 
-    fprintf(log_fp, "===== Servidor iniciado =====\n");
+    fprintf(log_fp, "===== Server on =====\n");
     fflush(log_fp);
 }
 
 
 
 /**
- * @brief Regista um evento/acesso no log do servidor.
- * @param ip Endereço IP do cliente.
- * @param method Método HTTP utilizado (ex: GET, POST).
- * @param path Caminho do recurso pedido.
- * @param status Código de estado HTTP da resposta.
- * @param size Número de bytes transferidos na resposta.
+ * @brief Logs an event/access in the server log.
+ * @param ip Client IP address.
+ * @param method HTTP method used (e.g., GET, POST).
+ * @param path Path of the requested resource.
+ * @param status HTTP status code of the response.
+ * @param size Number of bytes transferred in the response.
  */
 void logger_log(const char *ip,
                 const char *method,
@@ -61,11 +61,11 @@ void logger_log(const char *ip,
 
 
 /**
- * @brief Finaliza o sistema de logging, fechando o ficheiro de log se necessário.
+ * @brief Finalizes the logging system, closing the log file if necessary.
  */
 void logger_cleanup(void) {
     if (log_fp && log_fp != stdout) {
-        fprintf(log_fp, "===== Servidor desligado =====\n");
+        fprintf(log_fp, "===== Server off =====\n");
         fclose(log_fp);
     }
 }

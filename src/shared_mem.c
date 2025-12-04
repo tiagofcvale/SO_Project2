@@ -10,33 +10,33 @@
 #include "shared_mem.h"
 
 /**
- * @brief Cria ou abre um objeto de memória partilhada POSIX e faz o seu mapeamento.
- * @return Ponteiro para a memória partilhada mapeada, ou NULL em caso de erro.
+ * @brief Creates or opens a POSIX shared memory object and maps it.
+ * @return Pointer to the mapped shared memory, or NULL on error.
  */
 shared_data_t* shm_create(void) {
-    // 1. Criar/Abrir objeto de memória partilhada POSIX
+    // 1. Create/Open POSIX shared memory object
     int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
     if (fd == -1) {
-        perror("shm_open falhou");
+        perror("shm_open failed");
         return NULL;
     }
 
-    // 2. Definir o tamanho exato da estrutura
+    // 2. Set the exact size of the structure
     if (ftruncate(fd, sizeof(shared_data_t)) == -1) {
-        perror("ftruncate falhou");
+        perror("ftruncate failed");
         close(fd);
         return NULL;
     }
 
-    // 3. Mapear na memória do processo
+    // 3. Map into the process memory
     shared_data_t *ptr = mmap(NULL, sizeof(shared_data_t),
                               PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     
-    // O descritor já não é necessário após o mmap
+    // The descriptor is no longer needed after mmap
     close(fd);
 
     if (ptr == MAP_FAILED) {
-        perror("mmap falhou");
+        perror("mmap failed");
         return NULL;
     }
     
@@ -44,14 +44,14 @@ shared_data_t* shm_create(void) {
 }
 
 /**
- * @brief Liberta o mapeamento da memória partilhada e remove o objeto do sistema operativo.
- * @param data Ponteiro para a memória partilhada a desmapear.
+ * @brief Frees the shared memory mapping and removes the object from the operating system.
+ * @param data Pointer to the shared memory to unmap.
  */
 void shm_destroy(shared_data_t* data) {
     if (data) {
-        // Desmapear a memória do processo
+        // Unmap the memory from the process
         munmap(data, sizeof(shared_data_t));
     }
-    // Remover o objeto do sistema operativo (importante!)
+    // Remove the object from the operating system (important!)
     shm_unlink(SHM_NAME);
 }
