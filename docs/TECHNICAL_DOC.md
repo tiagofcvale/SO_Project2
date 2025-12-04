@@ -8,3 +8,6 @@ Tiago Francisco Crespo do Vale
 ## ========= System Architecture Diagram =======
 
 ![System Architecture Diagram](diagrams/architecture_diagram.png)
+
+
+## ============ Data Flow Diagrams ================
