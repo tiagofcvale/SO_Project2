@@ -26,7 +26,7 @@ Tiago Francisco Crespo do Vale
 
 **Screenshots:** 
 
-![TestCase1](/screenshots/testingitw.png)
+![TestCase1](/docs/screenshots/testingitw.png)
 
 
 ### Test Case 2: Test GET requests for images
@@ -50,4 +50,4 @@ Tiago Francisco Crespo do Vale
 
 **Screenshots:** 
 
-![TestCase1](/screenshots/testingimage.png)
+![TestCase2](/docs/screenshots/testingimage.png)
