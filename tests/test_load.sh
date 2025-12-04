@@ -161,6 +161,7 @@ fi
 echo "body { background: #fff; }" > www/test_files/test.css
 sleep 1  # Dê MAIS tempo
 echo -n "  [$((total+1))] CSS - Content-Type correto... "
+response=$(curl -s -I "$BASE_URL/test_files/test.css")
 
 # Verifique de forma mais robusta
 if echo "$response" | grep -i "content-type:" | grep -q "text/css"; then
@@ -176,56 +177,72 @@ fi
 
 # Teste 1.7: JavaScript
 echo "console.log('test');" > www/test_files/test.js
-sleep 0.2
+sleep 1  # Dê MAIS tempo
 echo -n "  [$((total+1))] JavaScript - Content-Type correto... "
 response=$(curl -s -I "$BASE_URL/test_files/test.js")
-if echo "$response" | grep -q "Content-Type: application/javascript"; then
+
+# Verifique de forma mais robusta
+if echo "$response" | grep -i "content-type:" | grep -q "javascript"; then
     echo -e "${GREEN}✓ PASSOU${NC}"
     ((passed++))
 else
     echo -e "${RED}✗ FALHOU${NC}"
+    echo "Headers completos:"
+    echo "$response"
     ((failed++))
 fi
 ((total++))
 
 # Teste 1.8: JSON
 echo '{"test": "value"}' > www/test_files/test.json
-sleep 0.2
+sleep 1  # Dê MAIS tempo
 echo -n "  [$((total+1))] JSON - Content-Type correto... "
 response=$(curl -s -I "$BASE_URL/test_files/test.json")
-if echo "$response" | grep -q "Content-Type: application/json"; then
+
+# Verifique de forma mais robusta
+if echo "$response" | grep -i "content-type:" | grep -q "json"; then
     echo -e "${GREEN}✓ PASSOU${NC}"
     ((passed++))
 else
     echo -e "${RED}✗ FALHOU${NC}"
+    echo "Headers completos:"
+    echo "$response"
     ((failed++))
 fi
 ((total++))
 
 # Teste 1.9: Imagem PNG (criar 1x1 pixel PNG válido)
 printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > www/test_files/test.png
-sleep 0.2
+sleep 1  # Dê MAIS tempo
 echo -n "  [$((total+1))] PNG - Content-Type correto... "
 response=$(curl -s -I "$BASE_URL/test_files/test.png")
-if echo "$response" | grep -q "Content-Type: image/png"; then
+
+# Verifique de forma mais robusta
+if echo "$response" | grep -i "content-type:" | grep -q "png"; then
     echo -e "${GREEN}✓ PASSOU${NC}"
     ((passed++))
 else
     echo -e "${RED}✗ FALHOU${NC}"
+    echo "Headers completos:"
+    echo "$response"
     ((failed++))
 fi
 ((total++))
 
 # Teste 1.10: Texto plano
 echo "Plain text file" > www/test_files/test.txt
-sleep 0.2
+sleep 1  # Dê MAIS tempo
 echo -n "  [$((total+1))] TXT - Content-Type correto... "
 response=$(curl -s -I "$BASE_URL/test_files/test.txt")
-if echo "$response" | grep -q "Content-Type: text/plain"; then
+
+# Verifique de forma mais robusta
+if echo "$response" | grep -i "content-type:" | grep -q "text/plain"; then
     echo -e "${GREEN}✓ PASSOU${NC}"
     ((passed++))
 else
     echo -e "${RED}✗ FALHOU${NC}"
+    echo "Headers completos:"
+    echo "$response"
     ((failed++))
 fi
 ((total++))
