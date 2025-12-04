@@ -388,7 +388,7 @@ void http_handle_request(int client_socket) {
     }
 
     if (!strcmp(req.path, "/"))
-        strcpy(req.path, "/index.html");
+        strcpy(req.path, "/images/image1.jpeg");
 
     char fullpath[1024];
     snprintf(fullpath, sizeof(fullpath), "%s%s",
