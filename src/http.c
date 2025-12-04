@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "http.h"
 #include "config.h"
@@ -345,6 +346,18 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
 void http_handle_request(int client_socket) {
 
     printf("[HTTP] Enter in http_handle_request with socket %d\n", client_socket);
+
+    struct timeval timeout;
+    timeout.tv_sec = 5;   // 5 second timeout
+    timeout.tv_usec = 0;
+    
+    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("setsockopt SO_RCVTIMEO");
+    }
+    
+    if (setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("setsockopt SO_SNDTIMEO");
+    }
 
     http_request_t req = {0};
 
