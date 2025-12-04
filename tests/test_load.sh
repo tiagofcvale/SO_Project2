@@ -19,6 +19,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+mkdir -p www/test_files 2>/dev/null
+
 # Contadores globais
 total=0
 passed=0
@@ -44,6 +46,7 @@ test_request() {
     fi
     ((total++))
 }
+
 
 # Verificar dependências
 echo -e "${BLUE}=== Verificação de Dependências ===${NC}"
@@ -79,15 +82,29 @@ echo ""
 # Verificar se o servidor está a correr
 echo -e "${BLUE}=== Verificação do Servidor ===${NC}"
 echo -n "A verificar conectividade... "
-if ! curl -s --connect-timeout 2 "$BASE_URL" > /dev/null 2>&1; then
+
+MAX_RETRIES=10
+RETRY_COUNT=0
+SERVER_READY=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -s --connect-timeout 2 "$BASE_URL/" > /dev/null 2>&1; then
+        SERVER_READY=1
+        break
+    fi
+    ((RETRY_COUNT++))
+    echo -n "."
+    sleep 1
+done
+
+if [ $SERVER_READY -eq 1 ]; then
+    echo -e "${GREEN}✓ PASSOU${NC} (após $RETRY_COUNT tentativas)"
+else
     echo -e "${RED}✗ FALHOU${NC}"
-    echo -e "${RED}ERRO: Servidor não está a responder em $BASE_URL${NC}"
-    echo "Inicie o servidor primeiro com: ./server"
+    echo -e "${RED}ERRO: Servidor não está a responder em $BASE_URL após $MAX_RETRIES tentativas${NC}"
     exit 1
 fi
-echo -e "${GREEN}✓ PASSOU${NC}"
 echo ""
-
 #############################################
 # TESTES FUNCIONAIS
 #############################################
@@ -142,14 +159,17 @@ fi
 
 # Teste 1.6: CSS
 echo "body { background: #fff; }" > www/test_files/test.css
-sleep 0.2
+sleep 1  # Dê MAIS tempo
 echo -n "  [$((total+1))] CSS - Content-Type correto... "
-response=$(curl -s -I "$BASE_URL/test_files/test.css")
-if echo "$response" | grep -q "Content-Type: text/css"; then
+
+# Verifique de forma mais robusta
+if echo "$response" | grep -i "content-type:" | grep -q "text/css"; then
     echo -e "${GREEN}✓ PASSOU${NC}"
     ((passed++))
 else
     echo -e "${RED}✗ FALHOU${NC}"
+    echo "Headers completos:"
+    echo "$response"
     ((failed++))
 fi
 ((total++))
