@@ -11,10 +11,10 @@ typedef struct {
     sem_t *sem_log;    
 } ipc_semaphores_t;
 
-// Inicializa os semáforos nomeados
+// Initializes the named semaphores
 int sem_init_ipc(ipc_semaphores_t *sems, int queue_size);
 
-// Fecha e remove os semáforos do sistema
+// Closes and removes the semaphores from the system
 void sem_cleanup_ipc(ipc_semaphores_t *sems);
 
 #endif

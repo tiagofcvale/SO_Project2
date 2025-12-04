@@ -12,19 +12,19 @@
 
 
 /**
- * @brief Ponteiro global para a memória partilhada, acessível por outros módulos.
+ * @brief Global pointer to shared memory, accessible by other modules.
  */
 shared_data_t* shm_data = NULL;
 
 /**
- * @brief Estrutura global com os semáforos IPC usados pelo worker.
+ * @brief Global structure with the IPC semaphores used by the worker.
  */
 ipc_semaphores_t sems;
 
 /**
- * @brief Função principal do processo worker. Liga-se à memória partilhada, abre os semáforos,
- *        cria o pool de threads e aceita ligações de clientes, distribuindo-as pelas threads.
- * @param listen_fd File descriptor do socket de escuta (aceita novas ligações TCP).
+ * @brief Main function of the worker process. Attaches to shared memory, opens semaphores,
+ *        creates the thread pool, and accepts client connections, distributing them to threads.
+ * @param listen_fd File descriptor of the listening socket (accepts new TCP connections).
  */
 void worker_main(int listen_fd) {
     // Attach to shared memory created by master
@@ -48,17 +48,17 @@ void worker_main(int listen_fd) {
         exit(1);
     }
 
-    // criar thread pool local deste worker
+    // create this worker's local thread pool
     thread_pool_t pool;
     thread_pool_init(&pool, get_threads_per_worker());
 
-    printf("Worker %d iniciado.\n", getpid());
+    printf("Worker %d iniciated.\n", getpid());
 
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t len = sizeof(client_addr);
 
-        // cada worker faz accept() directamente
+        // each worker does accept() directly
         int client_socket = accept(listen_fd,
                                    (struct sockaddr *)&client_addr,
                                    &len);
@@ -68,14 +68,14 @@ void worker_main(int listen_fd) {
             continue;
         }
 
-        printf("Worker %d recebeu socket %d de %s:%d\n",
+        printf("Worker %d receive socket %d from %s:%d\n",
                getpid(),
                client_socket,
                inet_ntoa(client_addr.sin_addr),
                ntohs(client_addr.sin_port));
 
-        // mandar o socket para uma thread deste worker
-        // Se falhar (retorna -1), o socket já foi fechado pelo thread_pool_add
+        // send the socket to a thread of this worker
+        // If it fails (returns -1), the socket has already been closed by thread_pool_add
         thread_pool_add(&pool, client_socket);
     }
 }

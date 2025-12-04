@@ -4,18 +4,18 @@
 #include "connection_queue.h"
 #include "stats.h"
 
-// Nome identificador da memória partilhada no sistema
+// Name identifier of the shared memory in the system
 #define SHM_NAME "/webserver_shm_v1"
 
 typedef struct {
-    connection_queue_t queue; // A fila circular de sockets (definida no connection_queue.h)
-    server_stats_t stats;     // As estatísticas globais (definida no stats.h)
+    connection_queue_t queue; // The circular socket queue (defined in connection_queue.h)
+    server_stats_t stats;     // The global statistics (defined in stats.h)
 } shared_data_t;
 
-// Função para criar/abrir a memória partilhada
+// Function to create/open the shared memory
 shared_data_t* shm_create(void);
 
-// Função para destruir/limpar a memória partilhada
+// Function to destroy/clean the shared memory
 void shm_destroy(shared_data_t* data);
 
 #endif

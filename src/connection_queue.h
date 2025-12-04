@@ -3,7 +3,7 @@
 
 #define MAX_QUEUE_SIZE 100
 
-// Estrutura que vive na SHM
+// Structure that lives in SHM (Shared Memory)
 typedef struct {
     int sockets[MAX_QUEUE_SIZE];
     int front;

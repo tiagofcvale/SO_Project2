@@ -3,8 +3,8 @@
 #include "stats.h"
 
 /**
- * @brief Inicializa a estrutura de estatísticas a zero.
- * @param stats Ponteiro para a estrutura de estatísticas a inicializar.
+ * @brief Initializes the statistics structure to zero.
+ * @param stats Pointer to the statistics structure to initialize.
  */
 void stats_init(server_stats_t *stats) {
     if (stats) {
@@ -20,17 +20,17 @@ void stats_init(server_stats_t *stats) {
 }
 
 /**
- * @brief Atualiza os contadores de estatísticas de forma segura (thread-safe e process-safe).
- * @param stats Ponteiro para a estrutura de estatísticas.
- * @param mutex Semáforo para proteção da secção crítica.
- * @param status_code Código de estado HTTP do pedido.
- * @param bytes Número de bytes transferidos neste pedido.
+ * @brief Safely updates the statistics counters (thread-safe and process-safe).
+ * @param stats Pointer to the statistics structure.
+ * @param mutex Semaphore for critical section protection.
+ * @param status_code HTTP status code of the request.
+ * @param bytes Number of bytes transferred in this request.
  */
 
 void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long bytes) {
     if (!stats || !mutex) return;
 
-    // Entrar na secção crítica (Bloqueia outros processos)
+    // Enter critical section (Blocks other processes)
     sem_wait(mutex);
 
     stats->total_requests++;
@@ -44,14 +44,14 @@ void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long byt
         case 500: stats->status_500++; break;
     }
 
-    // Sair da secção crítica (Liberta para outros processos)
+    // Exit critical section (Releases for other processes)
     sem_post(mutex);
 }
 
 /**
- * @brief Incrementa o número de conexões ativas de forma segura.
- * @param stats Ponteiro para a estrutura de estatísticas.
- * @param mutex Semáforo para proteção da secção crítica.
+ * @brief Safely increments the number of active connections.
+ * @param stats Pointer to the statistics structure.
+ * @param mutex Semaphore for critical section protection.
  */
 void stats_connection_start(server_stats_t *stats, sem_t *mutex) {
     if (!stats || !mutex) return;
@@ -61,9 +61,9 @@ void stats_connection_start(server_stats_t *stats, sem_t *mutex) {
 }
 
 /**
- * @brief Decrementa o número de conexões ativas de forma segura.
- * @param stats Ponteiro para a estrutura de estatísticas.
- * @param mutex Semáforo para proteção da secção crítica.
+ * @brief Safely decrements the number of active connections.
+ * @param stats Pointer to the statistics structure.
+ * @param mutex Semaphore for critical section protection.
  */
 void stats_connection_end(server_stats_t *stats, sem_t *mutex) {
     if (!stats || !mutex) return;
@@ -73,23 +73,29 @@ void stats_connection_end(server_stats_t *stats, sem_t *mutex) {
 }
 
 /**
- * @brief Imprime as estatísticas atuais de forma segura.
- * @param stats Ponteiro para a estrutura de estatísticas.
- * @param mutex Semáforo para proteção da secção crítica.
+ * @brief Safely prints the current statistics.
+ * @param stats Pointer to the statistics structure.
+ * @param mutex Semaphore for critical section protection.
  */
 void stats_print(server_stats_t *stats, sem_t *mutex) {
     if (!stats || !mutex) return;
     
     server_stats_t snapshot;
 
-    // Copia rápida para evitar bloquear o servidor enquanto imprime
+    // Quick copy to avoid blocking the server while printing
     sem_wait(mutex);
     snapshot = *stats;
     sem_post(mutex);
 
-    printf("\n=== Estatísticas ===\n");
-    printf("Pedidos Totais: %ld\n", snapshot.total_requests);
-    printf("Bytes:          %ld\n", snapshot.bytes_transferred);
-    printf("Ativos:         %d\n", snapshot.active_connections);
-    printf("====================\n");
+    printf("\n=== Statistics ===\n");
+    printf("Total Requests:   %ld\n", snapshot.total_requests);
+    printf("Bytes:            %ld\n", snapshot.bytes_transferred);
+    printf("Active:           %d\n", snapshot.active_connections);
+    printf("\n--- HTTP Status Codes ---\n");
+    printf("200 OK:           %ld\n", snapshot.status_200);
+    printf("400 Bad Request:  %ld\n", snapshot.status_400);
+    printf("403 Forbidden:    %ld\n", snapshot.status_403);
+    printf("404 Not Found:    %ld\n", snapshot.status_404);
+    printf("500 Server Error: %ld\n", snapshot.status_500);
+    printf("========================\n");
 }

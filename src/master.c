@@ -17,7 +17,7 @@
 #include "shared_mem.h"
 #include "semaphores.h"
 
-// Variáveis globais para limpeza no signal handler
+// Global variables for cleanup in the signal handler
 static int server_socket = -1;
 static shared_data_t *shm_data = NULL;
 static ipc_semaphores_t sems;
@@ -25,8 +25,8 @@ static pid_t *worker_pids = NULL;
 
 
 /**
- * @brief Envia uma resposta HTTP 503 e fecha o socket, usado quando a fila está cheia.
- * @param fd Descritor de socket do cliente.
+ * @brief Sends an HTTP 503 response and closes the socket, used when the queue is full.
+ * @param fd Client socket descriptor.
  */
 void send_503_and_close(int fd) {
     const char *resp = "HTTP/1.1 503 Service Unavailable\r\n"
@@ -38,14 +38,15 @@ void send_503_and_close(int fd) {
 }
 
 /**
- * @brief Handler para o sinal SIGINT (CTRL+C). Limpa recursos IPC, termina workers e encerra o servidor.
- * @param sig Número do sinal recebido (não usado).
+ * @brief Handler for the SIGINT signal (CTRL+C). Cleans up IPC resources, terminates workers, and shuts down the server.
+ * @param sig Signal number received (unused).
  */
 void handle_sigint(int sig) {
     (void)sig;
-    printf("\n[Master] Recebido SIGINT. A encerrar servidor...\n");
+    printf("\n[Master] Received SIGINT. Shutting down server...\n");
 
-    // 1. Matar processos workers
+
+    // 1. Kill worker processes
     int n = get_num_workers();
     if (worker_pids) {
         for (int i = 0; i < n; i++) {
@@ -56,45 +57,45 @@ void handle_sigint(int sig) {
         free(worker_pids);
     }
 
-    // 2. Fechar socket principal
+    // 2. Close main socket
     if (server_socket >= 0) {
         close(server_socket);
     }
 
-    // 3. Limpar IPC (CRUCIAL: shm_unlink e sem_unlink)
+    // 3. Clean up IPC (CRUCIAL: shm_unlink and sem_unlink)
     shm_destroy(shm_data);
     sem_cleanup_ipc(&sems);
 
     logger_cleanup();
-    printf("[Master] Limpeza concluída. Adeus.\n");
+    printf("[Master] Clean up is done. Bye.\n");
     exit(0);
 }
 
 
 /**
- * @brief Função principal do processo master. Inicializa IPC, socket, cria workers e monitoriza o servidor.
- * @return 0 em caso de sucesso, -1 em caso de erro.
+ * @brief Main function of the master process. Initializes IPC, socket, creates workers, and monitors the server.
+ * @return 0 on success, -1 on error.
  */
 int master_start(void) {
     signal(SIGINT, handle_sigint);
 
-    // 1. Inicializar IPC
+    // 1. Initialize IPC
     shm_data = shm_create();
     if (!shm_data) return -1;
     
-    // Inicializar Stats e Fila
+    // Initialize Stats and Queue
     stats_init(&shm_data->stats);
     shm_data->queue.front = 0;
     shm_data->queue.rear = 0;
     shm_data->queue.count = 0;
 
-    // Inicializar Semáforos
+    // Initialize Semaphores
     if (sem_init_ipc(&sems, get_max_queue_size()) < 0) {
         shm_destroy(shm_data);
         return -1;
     }
 
-    // 2. Criar Socket
+    // 2. Create Socket
     struct sockaddr_in server_addr;
     int opt = 1;
 
@@ -114,16 +115,16 @@ int master_start(void) {
         perror("listen"); return -1;
     }
 
-    printf("[Master] A ouvir na porta %d. A lançar workers...\n", get_server_port());
+    printf("[Master] Listeing on port %d. Launching workers...\n", get_server_port());
 
-    // 3. Criar Workers
+    // 3. Create Workers
     int n_workers = get_num_workers();
     worker_pids = malloc(sizeof(pid_t) * n_workers);
 
     for (int i = 0; i < n_workers; i++) {
         pid_t pid = fork();
         if (pid == 0) {
-            // Worker HERDA o server_socket e vai usá-lo
+            // Worker INHERITS the server_socket and will use it
             worker_main(server_socket); 
             exit(0);
         } else {
@@ -131,12 +132,12 @@ int master_start(void) {
         }
     }
 
-    // 4. Mestre em modo de Monitorização
-    // O Mestre já não faz accept, apenas monitoriza e imprime stats
-    printf("[Master] Servidor Ativo. (CTRL+C para sair)\n");
+    // 4. Master in Monitoring mode
+    // The Master no longer does accept, only monitors and prints stats
+    printf("[Master] Server On (CTRL+C to off)\n");
     
     while (1) {
-        sleep(5); // Imprimir stats a cada 5 segundos
+        sleep(5); // Print stats every 5 seconds
         stats_print(&shm_data->stats, sems.sem_stats);
     }
 
@@ -144,11 +145,11 @@ int master_start(void) {
 }
 
 /**
- * @brief Para o servidor de forma ordenada (função opcional para interface)
- * @return 0 em sucesso
+ * @brief Stops the server in an orderly way (optional function for interface)
+ * @return 0 on success
  */
 int master_stop(void) {
-    // Trigger do shutdown via sinal
+    // Trigger shutdown via signal
     raise(SIGINT);
     return 0;
 }

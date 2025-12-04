@@ -26,9 +26,9 @@ extern shared_data_t* shm_data;
 extern ipc_semaphores_t sems;
 
 /**
- * @brief Devolve o MIME type apropriado para um ficheiro com base na extensão.
- * @param path Caminho do ficheiro.
- * @return String com o MIME type correspondente.
+ * @brief Returns the appropriate MIME type for a file based on its extension.
+ * @param path File path.
+ * @return String with the corresponding MIME type.
  */
 static const char* mime_from_path(const char* path) {
 
@@ -54,11 +54,11 @@ static const char* mime_from_path(const char* path) {
 
 
 /**
- * @brief Lê uma linha do socket sem bloquear, até '\n' ou atingir o máximo.
- * @param fd Descritor do socket.
- * @param buf Buffer de destino para a linha lida.
- * @param max Tamanho máximo do buffer.
- * @return Número de bytes lidos, ou -1 em caso de erro.
+ * @brief Reads a line from the socket non-blocking, until '\n' or reaching the maximum.
+ * @param fd Socket descriptor.
+ * @param buf Destination buffer for the read line.
+ * @param max Maximum buffer size.
+ * @return Number of bytes read, or -1 on error.
  */
 static int read_line(int fd, char* buf, int max) {
     int i = 0;
@@ -68,15 +68,15 @@ static int read_line(int fd, char* buf, int max) {
         int n = recv(fd, &c, 1, 0);
 
         if (n == 0) {
-            // cliente fechou a ligação
+            // client closed the connection
             break;
         }
 
         if (n < 0) {
-            // interrupções do sistema → tentar de novo
+            // system interruptions → try again
             if (errno == EINTR) continue;
 
-            // socket não tem dados ainda → tentar de novo
+            // socket has no data yet → try again
             if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
 
             return -1;
@@ -94,24 +94,24 @@ static int read_line(int fd, char* buf, int max) {
 
 
 /**
- * @brief Faz o parsing do pedido HTTP, separando método, caminho e headers.
- * @param client_fd Descritor do socket do cliente.
- * @param req Estrutura onde os dados do pedido serão guardados.
- * @return 0 em caso de sucesso, -1 em caso de erro.
+ * @brief Parses the HTTP request, separating method, path, and headers.
+ * @param client_fd Client socket descriptor.
+ * @param req Structure where the request data will be stored.
+ * @return 0 on success, -1 on error.
  */
 static int parse_request(int client_fd, http_request_t* req) {
     char line[MAX_REQ_LINE];
 
-    printf("[PARSE] A ler request...\n");
+    printf("[PARSE] Reading request ...\n");
 
-    // Primeira linha
+    // First line
     int n = read_line(client_fd, line, sizeof(line));
     printf("[PARSE] First line raw: '%s' (n=%d)\n", line, n);
 
     if (n <= 0) return -1;
 
     sscanf(line, "%7s %1023s %15s", req->method, req->path, req->version);
-    printf("[PARSE] Método='%s' Path='%s' Versão='%s'\n",
+    printf("[PARSE] Method='%s' Path='%s' Version='%s'\n",
            req->method, req->path, req->version);
 
     // Headers
@@ -122,7 +122,7 @@ static int parse_request(int client_fd, http_request_t* req) {
         if (n <= 0) return -1;
 
         if (!strcmp(line, "\r\n")) {
-            printf("[PARSE] Fim dos headers\n");
+            printf("[PARSE] End of headers\n");
             break;
         }
 
@@ -138,10 +138,10 @@ static int parse_request(int client_fd, http_request_t* req) {
 
 
 /**
- * @brief Envia uma página de erro HTTP personalizada ou genérica para o cliente.
- * @param fd Descritor do socket do cliente.
- * @param code Código de erro HTTP (ex: 404, 500).
- * @param msg Mensagem associada ao erro.
+ * @brief Sends a custom or generic HTTP error page to the client.
+ * @param fd Client socket descriptor.
+ * @param code HTTP error code (e.g., 404, 500).
+ * @param msg Message associated with the error.
  */
 static void send_error_page(int fd, int code, const char* msg) {
 
@@ -209,10 +209,10 @@ static void send_error_page(int fd, int code, const char* msg) {
 
 
 /**
- * @brief Serve um ficheiro ao cliente, usando a cache se possível.
- * @param fd Descritor do socket do cliente.
- * @param fullpath Caminho absoluto do ficheiro a servir.
- * @param is_head Se 1, envia apenas headers (método HEAD), se 0 envia body também (GET).
+ * @brief Serves a file to the client, using the cache if possible.
+ * @param fd Client socket descriptor.
+ * @param fullpath Absolute path of the file to serve.
+ * @param is_head If 1, sends only headers (HEAD method), if 0 sends body as well (GET).
  */
 static void serve_file(int fd, const char *fullpath, int is_head) {
 
@@ -237,7 +237,7 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
 
         send(fd, header, h, 0);
         
-        // Se for HEAD, não enviamos o body
+        // If HEAD, do not send the body
         if (!is_head) {
             send(fd, cached_data, cached_size, 0);
         }
@@ -278,12 +278,12 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
         "\r\n",
         mime, st.st_size
     );
-    printf("[SERVE] header enviado (%d bytes)\n", h);
+    printf("[SERVE] header sent (%d bytes)\n", h);
 
 
     send(fd, header, h, 0);
 
-    // Se for HEAD, não enviamos o body
+    // If HEAD, do not send the body
     if (is_head) {
         close(file_fd);
         if (shm_data) {
@@ -292,7 +292,7 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
         return;
     }
 
-    printf("[SERVE] ficheiro enviado (%ld bytes)\n", st.st_size);
+    printf("[SERVE] file sent (%ld bytes)\n", st.st_size);
 
 
     char* file_data = malloc(st.st_size);
@@ -339,13 +339,13 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
 
 
 /**
- * @brief Função principal para tratar um pedido HTTP de um cliente.
- *        Faz parsing, validação, serve ficheiros e regista logs e estatísticas.
- * @param client_socket Descritor do socket do cliente.
+ * @brief Main function to handle an HTTP request from a client.
+ *        Parses, validates, serves files, and logs statistics.
+ * @param client_socket Client socket descriptor.
  */
 void http_handle_request(int client_socket) {
 
-    printf("[HTTP] Entrou no http_handle_request com socket %d\n", client_socket);
+    printf("[HTTP] Enter in http_handle_request with socket %d\n", client_socket);
 
     struct timeval timeout;
     timeout.tv_sec = 5;   // 5 second timeout
@@ -374,7 +374,7 @@ void http_handle_request(int client_socket) {
         return;
     }
 
-    // Suportar GET e HEAD
+    // Support GET and HEAD
     int is_head = 0;
     if (strcmp(req.method, "GET") == 0) {
         is_head = 0;
@@ -394,8 +394,8 @@ void http_handle_request(int client_socket) {
     snprintf(fullpath, sizeof(fullpath), "%s%s",
              get_document_root(), req.path);
 
-    // DEBUG: Mostrar o caminho completo do ficheiro procurado
-    printf("DEBUG: Procurando ficheiro: %s\n", fullpath);
+    // DEBUG: Show the full path of the requested file
+    printf("DEBUG: Looking for file: %s\n", fullpath);
 
     struct stat st;
     if (stat(fullpath, &st) < 0) {

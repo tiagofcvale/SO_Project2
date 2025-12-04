@@ -10,42 +10,42 @@
 
 
 /**
- * @brief Função principal do servidor HTTP. Carrega configuração, inicializa módulos
- *        (logger, cache) e arranca o processo master que gere os workers e recursos IPC.
- * @return 0 em caso de sucesso, 1 em caso de erro crítico.
+ * @brief Main function of the HTTP server. Loads configuration, initializes modules
+ *        (logger, cache), and starts the master process that manages workers and IPC resources.
+ * @return 0 on success, 1 on critical error.
  */
 int main(void) {
 
-    // 1. Carregar configuração
+    // 1. Load configuration
     if (load_config("server.conf") != 0) {
-        fprintf(stderr, "Erro ao carregar configuração.\n");
+        fprintf(stderr, "Error loading configuration.\n");
         return 1;
     }
 
-    printf("A iniciar servidor HTTP com:\n");
+    printf("Starting HTTP server with:\n");
     printf("- Workers: %d\n", get_num_workers());
-    printf("- Threads por worker: %d\n", get_threads_per_worker());
+    printf("- Threads per worker: %d\n", get_threads_per_worker());
     printf("- Document root: %s\n", get_document_root());
     printf("- Cache: %d MB\n", get_cache_size_mb());
 
-    // 2. Iniciar Logger
+    // 2. Start Logger
     logger_init();
 
-    // 3. Iniciar Cache (Global para o Master, herdada pelos Workers no fork)
+    // 3. Start Cache (Global for the Master, inherited by Workers on fork)
     cache_init(get_cache_size_mb());
 
-    // NOTA: stats_init removido daqui.
-    // Agora é o master_start() que inicializa as stats dentro da Memória Partilhada.
+    // NOTE: stats_init removed from here.
+    // Now master_start() initializes stats inside Shared Memory.
 
-    // 4. Iniciar o Mestre (Cria SHM, Semáforos, Sockets e Workers)
+    // 4. Start the Master (Creates SHM, Semaphores, Sockets, and Workers)
     if (master_start() != 0) {
-        fprintf(stderr, "Erro crítico a iniciar servidor.\n");
+        fprintf(stderr, "Critical error starting server.\n");
         cache_cleanup();
         logger_cleanup();
         return 1;
     }
 
-    // Limpeza final (só chega aqui se o master retornar, o que não deve acontecer em loop)
+    // Final cleanup (only reached if master returns, which should not happen in loop)
     cache_cleanup();
     logger_cleanup();
     return 0;

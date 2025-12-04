@@ -5,58 +5,58 @@
 #include "semaphores.h"
 
 /**
- * @brief Inicializa e cria os semáforos POSIX nomeados usados pelo servidor.
- *        Remove semáforos antigos, cria novos e associa-os à estrutura fornecida.
- * @param sems Ponteiro para a estrutura onde ficam os descritores dos semáforos.
- * @param queue_size Tamanho da fila de pedidos (valor inicial do semáforo empty).
- * @return 0 em caso de sucesso, -1 em caso de erro.
+ * @brief Initializes and creates the named POSIX semaphores used by the server.
+ *        Removes old semaphores, creates new ones, and associates them with the provided structure.
+ * @param sems Pointer to the structure where the semaphore descriptors are stored.
+ * @param queue_size Request queue size (initial value for the empty semaphore).
+ * @return 0 on success, -1 on error.
  */
 int sem_init_ipc(ipc_semaphores_t *sems, int queue_size) {
-    // Limpeza preventiva de execuções anteriores
+    // Preventive cleanup from previous runs
     sem_unlink("/sem_ws_empty");
     sem_unlink("/sem_ws_full");
     sem_unlink("/sem_ws_mutex");
     sem_unlink("/sem_ws_stats");
     sem_unlink("/sem_ws_log");
 
-    // Abrir semáforos com O_CREAT
-    // Permissões 0666 para leitura/escrita
+    // Open semaphores with O_CREAT
+    // 0666 permissions for read/write
     
-    // sem_empty inicia com queue_size (fila toda vazia)
+    // sem_empty starts with queue_size (queue completely empty)
     sems->sem_empty = sem_open("/sem_ws_empty", O_CREAT, 0666, queue_size);
     
-    // sem_full inicia com 0 (nenhum item na fila)
+    // sem_full starts with 0 (no items in the queue)
     sems->sem_full  = sem_open("/sem_ws_full",  O_CREAT, 0666, 0);
     
-    // Mutexes iniciam com 1 (livres)
+    // Mutexes start with 1 (free)
     sems->sem_mutex = sem_open("/sem_ws_mutex", O_CREAT, 0666, 1);
     sems->sem_stats = sem_open("/sem_ws_stats", O_CREAT, 0666, 1);
     sems->sem_log   = sem_open("/sem_ws_log",   O_CREAT, 0666, 1);
 
-    // Verificar erros
+    // Check for errors
     if (sems->sem_empty == SEM_FAILED || sems->sem_full == SEM_FAILED || 
         sems->sem_mutex == SEM_FAILED || sems->sem_stats == SEM_FAILED ||
         sems->sem_log == SEM_FAILED) {
-        perror("sem_init_ipc falhou");
+        perror("sem_init_ipc failed");
         return -1;
     }
     return 0;
 }
 
 /**
- * @brief Fecha e remove os semáforos POSIX nomeados usados pelo servidor.
- *        Fecha os descritores e faz unlink dos semáforos do sistema operativo.
- * @param sems Ponteiro para a estrutura com os descritores dos semáforos.
+ * @brief Closes and removes the named POSIX semaphores used by the server.
+ *        Closes the descriptors and unlinks the semaphores from the operating system.
+ * @param sems Pointer to the structure with the semaphore descriptors.
  */
 void sem_cleanup_ipc(ipc_semaphores_t *sems) {
-    // Fechar descritores
+    // Close descriptors
     if(sems->sem_empty != SEM_FAILED) sem_close(sems->sem_empty);
     if(sems->sem_full  != SEM_FAILED) sem_close(sems->sem_full);
     if(sems->sem_mutex != SEM_FAILED) sem_close(sems->sem_mutex);
     if(sems->sem_stats != SEM_FAILED) sem_close(sems->sem_stats);
     if(sems->sem_log   != SEM_FAILED) sem_close(sems->sem_log);
 
-    // Remover do sistema operativo (unlink)
+    // Remove from the operating system (unlink)
     sem_unlink("/sem_ws_empty");
     sem_unlink("/sem_ws_full");
     sem_unlink("/sem_ws_mutex");

@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -10,9 +12,9 @@
 #include "http.h"
 
 /**
- * @brief Remove e retorna um socket da fila de trabalho (consumidor).
- * @param pool Ponteiro para o pool de threads.
- * @return Descritor de socket retirado da fila.
+ * @brief Removes and returns a socket from the work queue (consumer).
+ * @param pool Pointer to the thread pool.
+ * @return Socket descriptor taken from the queue.
  */
 static int queue_pop(thread_pool_t *pool) {
     thread_pool_queue_t *q = &pool->queue;
@@ -33,9 +35,9 @@ static int queue_pop(thread_pool_t *pool) {
 }
 
 /**
- * @brief Função executada por cada thread do pool.
- * @param arg Ponteiro para o pool de threads (thread_pool_t*).
- * @return NULL (nunca retorna normalmente).
+ * @brief Function executed by each thread in the pool.
+ * @param arg Pointer to the thread pool (thread_pool_t*).
+ * @return NULL (never normally returns).
  */
 static void *worker_thread(void *arg) {
     thread_pool_t *pool = arg;
@@ -43,7 +45,8 @@ static void *worker_thread(void *arg) {
     while (1) {
         int client_socket = queue_pop(pool);
 
-        printf("  [Thread %ld] Recebi socket %d\n",
+        printf("  [Thread %ld] Received socket %d\n", 
+
                pthread_self(), client_socket);
 
         http_handle_request(client_socket);   
@@ -53,20 +56,20 @@ static void *worker_thread(void *arg) {
 }
 
 /**
- * @brief Adiciona um socket à fila de trabalho com timeout (produtor).
- * @param pool Ponteiro para o pool de threads.
- * @param client_socket Descritor de socket a adicionar à fila.
- * @return 0 em sucesso, -1 se timeout/falha.
+ * @brief Adds a socket to the work queue with timeout (producer).
+ * @param pool Pointer to the thread pool.
+ * @param client_socket Socket descriptor to add to the queue.
+ * @return 0 on success, -1 if timeout/failure.
  */
 int thread_pool_add(thread_pool_t *pool, int client_socket) {
     thread_pool_queue_t *q = &pool->queue;
 
     pthread_mutex_lock(&q->mutex);
 
-    // Esperar até 2 segundos por espaço na fila
+    // Wait up to 2 seconds for space in the queue
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 2;  // Timeout de 2 segundos
+    ts.tv_sec += 2;  // 2 second timeout
 
     while (q->count == WORKER_QUEUE_SIZE) {
         int ret = pthread_cond_timedwait(&q->cond_non_full, &q->mutex, &ts);
@@ -75,7 +78,7 @@ int thread_pool_add(thread_pool_t *pool, int client_socket) {
             pthread_mutex_unlock(&q->mutex);
             fprintf(stderr, "[WARN] Thread pool queue full - rejecting connection\n");
             
-            // Enviar 503 e fechar socket
+            // Send 503 and close socket
             const char *resp = "HTTP/1.1 503 Service Unavailable\r\n"
                              "Content-Type: text/plain\r\n"
                              "Connection: close\r\n\r\n"
@@ -97,13 +100,13 @@ int thread_pool_add(thread_pool_t *pool, int client_socket) {
 }
 
 /**
- * @brief Inicializa o pool de threads e a fila interna.
- * @param pool Ponteiro para o pool de threads a inicializar.
- * @param n Número de threads a criar no pool.
+ * @brief Initializes the thread pool and the internal queue.
+ * @param pool Pointer to the thread pool to initialize.
+ * @param n Number of threads to create in the pool.
  */
 void thread_pool_init(thread_pool_t *pool, int n) {
 
-    // Inicializar queue interna
+    // Initialize internal queue
     pool->queue.front = 0;
     pool->queue.rear  = 0;
     pool->queue.count = 0;
@@ -112,7 +115,7 @@ void thread_pool_init(thread_pool_t *pool, int n) {
     pthread_cond_init(&pool->queue.cond_non_empty, NULL);
     pthread_cond_init(&pool->queue.cond_non_full, NULL);
 
-    // Criar threads
+    // Create threads
     pool->thread_count = n;
     pool->threads = malloc(sizeof(pthread_t) * n);
 
@@ -120,5 +123,5 @@ void thread_pool_init(thread_pool_t *pool, int n) {
         pthread_create(&pool->threads[i], NULL, worker_thread, pool);
     }
 
-    printf("Worker process criou %d threads.\n", n);
+    printf("Worker process created %d threads.\n", n);
 }
