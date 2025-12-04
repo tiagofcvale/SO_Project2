@@ -22,6 +22,6 @@ typedef struct {
 } thread_pool_t;
 
 void thread_pool_init(thread_pool_t *pool, int n);
-void thread_pool_add(thread_pool_t *pool, int client_socket);
+int thread_pool_add(thread_pool_t *pool, int client_socket);  // Now returns int
 
 #endif

@@ -313,12 +313,16 @@ fi
 if command -v wget &> /dev/null; then
     echo -n "  [$((total+1))] 20 clientes wget paralelos... "
     temp_dir=$(mktemp -d)
+    
     for i in {1..20}; do
-        wget -q -O "$temp_dir/file_$i.html" "$BASE_URL/" &
+        # Add --timeout option
+        timeout 10 wget -q -O "$temp_dir/file_$i.html" "$BASE_URL/" &
     done
+    
+    # Wait with timeout
     wait
     
-    # Contar ficheiros baixados com sucesso
+    # Count successfully downloaded files
     downloaded=$(ls -1 "$temp_dir" 2>/dev/null | wc -l)
     rm -rf "$temp_dir"
     
@@ -330,8 +334,6 @@ if command -v wget &> /dev/null; then
         ((failed++))
     fi
     ((total++))
-else
-    echo -e "  ${YELLOW}⚠ Teste wget pulado (não instalado)${NC}"
 fi
 
 # Teste 2.5: Stress test com requisições a ficheiros diferentes
