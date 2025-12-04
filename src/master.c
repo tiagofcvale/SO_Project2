@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+
 #include "master.h"
 #include "config.h"
 #include "logger.h"
@@ -42,9 +43,13 @@ void send_503_and_close(int fd) {
  * @param sig Signal number received (unused).
  */
 void handle_sigint(int sig) {
+    static int already_cleaned = 0;
+    if (already_cleaned) {
+        return;
+    }
+    already_cleaned = 1;
     (void)sig;
     printf("\n[Master] Received SIGINT. Shutting down server...\n");
-
 
     // 1. Kill worker processes
     int n = get_num_workers();
@@ -115,7 +120,7 @@ int master_start(void) {
         perror("listen"); return -1;
     }
 
-    printf("[Master] Listeing on port %d. Launching workers...\n", get_server_port());
+    printf("[Master] Listening on port %d. Launching workers...\n", get_server_port());
 
     // 3. Create Workers
     int n_workers = get_num_workers();
@@ -124,6 +129,10 @@ int master_start(void) {
     for (int i = 0; i < n_workers; i++) {
         pid_t pid = fork();
         if (pid == 0) {
+            // Worker: create a new group of processes and ignores SIGINT
+            setpgid(0, 0); // Worker stay on its own group
+            signal(SIGINT, SIG_IGN); // Ignore SIGINT (CTRL+C)
+            
             // Worker INHERITS the server_socket and will use it
             worker_main(server_socket); 
             exit(0);
@@ -137,7 +146,7 @@ int master_start(void) {
     printf("[Master] Server On (CTRL+C to off)\n");
     
     while (1) {
-        sleep(5); // Print stats every 5 seconds
+        sleep(12); // Print stats every 12 seconds
         stats_print(&shm_data->stats, sems.sem_stats);
     }
 
