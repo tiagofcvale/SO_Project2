@@ -177,7 +177,7 @@ fi
 
 # Teste 1.7: JavaScript
 echo "console.log('test');" > www/test_files/test.js
-sleep 1  # Dê MAIS tempo
+sleep 2  # Dê MAIS tempo
 echo -n "  [$((total+1))] JavaScript - Content-Type correto... "
 response=$(curl -s -I "$BASE_URL/test_files/test.js")
 
@@ -679,6 +679,10 @@ fi
 
 echo -e "Taxa de sucesso: ${YELLOW}${success_rate}%${NC}"
 echo ""
+
+echo -e "${RED}Warning: I'm cleaning..."
+rm -r www/test_files
+rm -r www/testdir
 
 if [ $failed -eq 0 ]; then
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
