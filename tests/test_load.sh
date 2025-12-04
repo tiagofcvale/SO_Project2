@@ -1,32 +1,33 @@
 #!/bin/bash
-# Script de testes abrangente para o servidor HTTP multi-processo/multi-thread
-# Testa funcionalidade, concorrência, sincronização e stress
-# Uso: ./test_server.sh
+# Comprehensive test script for multi-process/multi-thread HTTP server
+# Tests functionality, concurrency, synchronization, and stress
+# Usage: ./test_server.sh
 
 PORT=8080
 HOST="localhost"
 BASE_URL="http://${HOST}:${PORT}"
 
 echo "=========================================="
-echo "  Testes Completos do Servidor HTTP"
+echo "  Complete HTTP Server Tests"
 echo "=========================================="
 echo ""
 
-# Cores para output
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Ensure test directory exists
 mkdir -p www/test_files 2>/dev/null
 
-# Contadores globais
+# Global counters
 total=0
 passed=0
 failed=0
 
-# Função auxiliar para testes
+# Helper function for tests
 test_request() {
     local name=$1
     local url=$2
@@ -38,50 +39,49 @@ test_request() {
     http_code=$(curl -s -o /dev/null -w "%{http_code}" $extra_args "$url")
     
     if [ "$http_code" = "$expected_code" ]; then
-        echo -e "${GREEN}✓ PASSOU${NC} (código: $http_code)"
+        echo -e "${GREEN}✓ PASSED${NC} (code: $http_code)"
         ((passed++))
     else
-        echo -e "${RED}✗ FALHOU${NC} (esperado: $expected_code, obtido: $http_code)"
+        echo -e "${RED}✗ FAILED${NC} (expected: $expected_code, got: $http_code)"
         ((failed++))
     fi
     ((total++))
 }
 
-
-# Verificar dependências
-echo -e "${BLUE}=== Verificação de Dependências ===${NC}"
+# Check dependencies
+echo -e "${BLUE}=== Dependency Check ===${NC}"
 MISSING_DEPS=0
 
 if ! command -v curl &> /dev/null; then
-    echo -e "${RED}✗ curl não está instalado${NC}"
+    echo -e "${RED}✗ curl not installed${NC}"
     MISSING_DEPS=1
 else
-    echo -e "${GREEN}✓ curl encontrado${NC}"
+    echo -e "${GREEN}✓ curl found${NC}"
 fi
 
 if ! command -v ab &> /dev/null; then
-    echo -e "${YELLOW}⚠ Apache Bench (ab) não encontrado - testes de carga limitados${NC}"
-    echo "  Instale com: sudo apt-get install apache2-utils"
+    echo -e "${YELLOW}⚠ Apache Bench (ab) not found - limited load tests${NC}"
+    echo "  Install with: sudo apt-get install apache2-utils"
 else
-    echo -e "${GREEN}✓ Apache Bench (ab) encontrado${NC}"
+    echo -e "${GREEN}✓ Apache Bench (ab) found${NC}"
 fi
 
 if ! command -v wget &> /dev/null; then
-    echo -e "${YELLOW}⚠ wget não encontrado - alguns testes serão pulados${NC}"
+    echo -e "${YELLOW}⚠ wget not found - some tests will be skipped${NC}"
 else
-    echo -e "${GREEN}✓ wget encontrado${NC}"
+    echo -e "${GREEN}✓ wget found${NC}"
 fi
 
 if [ $MISSING_DEPS -eq 1 ]; then
-    echo -e "${RED}ERRO: Dependências obrigatórias não encontradas${NC}"
+    echo -e "${RED}ERROR: Required dependencies not found${NC}"
     exit 1
 fi
 
 echo ""
 
-# Verificar se o servidor está a correr
-echo -e "${BLUE}=== Verificação do Servidor ===${NC}"
-echo -n "A verificar conectividade... "
+# Check if server is running
+echo -e "${BLUE}=== Server Check ===${NC}"
+echo -n "Checking connectivity... "
 
 MAX_RETRIES=10
 RETRY_COUNT=0
@@ -98,186 +98,186 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 if [ $SERVER_READY -eq 1 ]; then
-    echo -e "${GREEN}✓ PASSOU${NC} (após $RETRY_COUNT tentativas)"
+    echo -e "${GREEN}✓ PASSED${NC} (after $RETRY_COUNT attempts)"
 else
-    echo -e "${RED}✗ FALHOU${NC}"
-    echo -e "${RED}ERRO: Servidor não está a responder em $BASE_URL após $MAX_RETRIES tentativas${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
+    echo -e "${RED}ERROR: Server not responding at $BASE_URL after $MAX_RETRIES attempts${NC}"
     exit 1
 fi
 echo ""
+
 #############################################
-# TESTES FUNCIONAIS
+# FUNCTIONAL TESTS
 #############################################
-echo -e "${BLUE}=== 1. TESTES FUNCIONAIS ===${NC}"
+echo -e "${BLUE}=== 1. FUNCTIONAL TESTS ===${NC}"
 
-# Teste 1.1: GET / (index padrão)
-test_request "GET / (redireção para index.html)" "$BASE_URL/" "200"
+# Test 1.1: GET / (default index)
+test_request "GET / (redirect to index.html)" "$BASE_URL/" "200"
 
-# Teste 1.2: GET /index.html explícito
-test_request "GET /index.html explícito" "$BASE_URL/index.html" "200"
+# Test 1.2: GET /index.html explicit
+test_request "GET /index.html explicit" "$BASE_URL/index.html" "200"
 
-# Teste 1.3: HEAD / (apenas headers)
-echo -n "  [$((total+1))] HEAD / (apenas headers)... "
+# Test 1.3: HEAD / (headers only)
+echo -n "  [$((total+1))] HEAD / (headers only)... "
 response=$(curl -s -I "$BASE_URL/")
 if echo "$response" | grep -q "HTTP/1.1 200 OK" && ! echo "$response" | grep -q "<html>"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 1.4: HEAD /index.html
+# Test 1.4: HEAD /index.html
 echo -n "  [$((total+1))] HEAD /index.html... "
 response=$(curl -s -I "$BASE_URL/index.html")
 if echo "$response" | grep -q "HTTP/1.1 200 OK"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Criar ficheiros de teste para MIME types
-mkdir -p www/test_files 2>/dev/null
+# Create test files for MIME types
 
-# Teste 1.5: HTML
+# Test 1.5: HTML
 echo "<!DOCTYPE html><html><body><h1>Test HTML</h1></body></html>" > www/test_files/test.html
 sleep 0.2
-echo -n "  [$((total+1))] HTML - Content-Type correto... "
+echo -n "  [$((total+1))] HTML - Correct Content-Type... "
 response=$(curl -s -I "$BASE_URL/test_files/test.html")
 if echo "$response" | grep -q "Content-Type: text/html"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 1.6: CSS
+# Test 1.6: CSS
 echo "body { background: #fff; }" > www/test_files/test.css
-sleep 1  # Dê MAIS tempo
-echo -n "  [$((total+1))] CSS - Content-Type correto... "
+sleep 1  # Give MORE time
+echo -n "  [$((total+1))] CSS - Correct Content-Type... "
 response=$(curl -s -I "$BASE_URL/test_files/test.css")
 
-# Verifique de forma mais robusta
+# Check more robustly
 if echo "$response" | grep -i "content-type:" | grep -q "text/css"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
-    echo "Headers completos:"
+    echo -e "${RED}✗ FAILED${NC}"
+    echo "Full headers:"
     echo "$response"
     ((failed++))
 fi
 ((total++))
 
-# Teste 1.7: JavaScript
+# Test 1.7: JavaScript - CORRECTED
 echo "console.log('test');" > www/test_files/test.js
-sleep 2  # Dê MAIS tempo
-echo -n "  [$((total+1))] JavaScript - Content-Type correto... "
+sleep 1
+echo -n "  [$((total+1))] JavaScript - Correct Content-Type... "
 response=$(curl -s -I "$BASE_URL/test_files/test.js")
 
-# Verifique de forma mais robusta
-if echo "$response" | grep -i "content-type:" | grep -q "javascript"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+# Look for "application/javascript" not just "javascript"
+if echo "$response" | grep -i "content-type:" | grep -q "application/javascript"; then
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
-    echo "Headers completos:"
+    echo -e "${RED}✗ FAILED${NC}"
+    echo "Full headers:"
     echo "$response"
     ((failed++))
 fi
 ((total++))
 
-# Teste 1.8: JSON
+# Test 1.8: JSON - CORRECTED
 echo '{"test": "value"}' > www/test_files/test.json
-sleep 1  # Dê MAIS tempo
-echo -n "  [$((total+1))] JSON - Content-Type correto... "
+sleep 1
+echo -n "  [$((total+1))] JSON - Correct Content-Type... "
 response=$(curl -s -I "$BASE_URL/test_files/test.json")
 
-# Verifique de forma mais robusta
-if echo "$response" | grep -i "content-type:" | grep -q "json"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+# Look for "application/json" not just "json"
+if echo "$response" | grep -i "content-type:" | grep -q "application/json"; then
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
-    echo "Headers completos:"
+    echo -e "${RED}✗ FAILED${NC}"
+    echo "Full headers:"
     echo "$response"
     ((failed++))
 fi
 ((total++))
 
-# Teste 1.9: Imagem PNG (criar 1x1 pixel PNG válido)
+# Test 1.9: PNG image (create valid 1x1 pixel PNG)
 printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > www/test_files/test.png
-sleep 1  # Dê MAIS tempo
-echo -n "  [$((total+1))] PNG - Content-Type correto... "
+sleep 1
+echo -n "  [$((total+1))] PNG - Correct Content-Type... "
 response=$(curl -s -I "$BASE_URL/test_files/test.png")
 
-# Verifique de forma mais robusta
-if echo "$response" | grep -i "content-type:" | grep -q "png"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+# Look for "image/png" not just "png"
+if echo "$response" | grep -i "content-type:" | grep -q "image/png"; then
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
-    echo "Headers completos:"
+    echo -e "${RED}✗ FAILED${NC}"
+    echo "Full headers:"
     echo "$response"
     ((failed++))
 fi
 ((total++))
 
-# Teste 1.10: Texto plano
+# Test 1.10: Plain text
 echo "Plain text file" > www/test_files/test.txt
-sleep 1  # Dê MAIS tempo
-echo -n "  [$((total+1))] TXT - Content-Type correto... "
+sleep 1
+echo -n "  [$((total+1))] TXT - Correct Content-Type... "
 response=$(curl -s -I "$BASE_URL/test_files/test.txt")
 
-# Verifique de forma mais robusta
+# Already correct - looks for "text/plain"
 if echo "$response" | grep -i "content-type:" | grep -q "text/plain"; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
-    echo "Headers completos:"
+    echo -e "${RED}✗ FAILED${NC}"
+    echo "Full headers:"
     echo "$response"
     ((failed++))
 fi
 ((total++))
 
-# Teste 1.11: 404 Not Found
-test_request "404 - Ficheiro inexistente" "$BASE_URL/naoexiste12345.html" "404"
+# Test 1.11: 404 Not Found
+test_request "404 - Non-existent file" "$BASE_URL/naoexiste12345.html" "404"
 
-# Teste 1.12: 404 com caminho profundo
-test_request "404 - Caminho inexistente" "$BASE_URL/dir1/dir2/naoexiste.html" "404"
+# Test 1.12: 404 with deep path
+test_request "404 - Non-existent path" "$BASE_URL/dir1/dir2/naoexiste.html" "404"
 
-# Teste 1.13: 403 Forbidden (diretório)
+# Test 1.13: 403 Forbidden (directory)
 mkdir -p www/testdir 2>/dev/null
 echo "test" > www/testdir/file.txt
-test_request "403 - Acesso a diretório" "$BASE_URL/testdir" "403"
+test_request "403 - Directory access" "$BASE_URL/testdir" "403"
 
-# Teste 1.14: 501 Not Implemented (POST)
-test_request "501 - POST não implementado" "$BASE_URL/" "501" "-X POST"
+# Test 1.14: 501 Not Implemented (POST)
+test_request "501 - POST not implemented" "$BASE_URL/" "501" "-X POST"
 
-# Teste 1.15: 501 Not Implemented (PUT)
-test_request "501 - PUT não implementado" "$BASE_URL/" "501" "-X PUT"
+# Test 1.15: 501 Not Implemented (PUT)
+test_request "501 - PUT not implemented" "$BASE_URL/" "501" "-X PUT"
 
-# Teste 1.16: 501 Not Implemented (DELETE)
-test_request "501 - DELETE não implementado" "$BASE_URL/" "501" "-X DELETE"
+# Test 1.16: 501 Not Implemented (DELETE)
+test_request "501 - DELETE not implemented" "$BASE_URL/" "501" "-X DELETE"
 
-# Teste 1.17: Content-Length correto
-echo -n "  [$((total+1))] Content-Length correto... "
+# Test 1.17: Correct Content-Length
+echo -n "  [$((total+1))] Correct Content-Length... "
 echo "Test content with known size" > www/test_files/size_test.txt
 expected_size=$(wc -c < www/test_files/size_test.txt)
 response=$(curl -s -I "$BASE_URL/test_files/size_test.txt")
 actual_size=$(echo "$response" | grep -i "Content-Length:" | awk '{print $2}' | tr -d '\r')
 if [ "$actual_size" = "$expected_size" ]; then
-    echo -e "${GREEN}✓ PASSOU${NC} ($expected_size bytes)"
+    echo -e "${GREEN}✓ PASSED${NC} ($expected_size bytes)"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC} (esperado: $expected_size, obtido: $actual_size)"
+    echo -e "${RED}✗ FAILED${NC} (expected: $expected_size, got: $actual_size)"
     ((failed++))
 fi
 ((total++))
@@ -285,30 +285,30 @@ fi
 echo ""
 
 #############################################
-# TESTES DE CONCORRÊNCIA
+# CONCURRENCY TESTS
 #############################################
-echo -e "${BLUE}=== 2. TESTES DE CONCORRÊNCIA ===${NC}"
+echo -e "${BLUE}=== 2. CONCURRENCY TESTS ===${NC}"
 
-# Teste 2.1: 50 requisições concorrentes (curl)
-echo -n "  [$((total+1))] 50 requisições concorrentes (curl)... "
+# Test 2.1: 50 concurrent requests (curl)
+echo -n "  [$((total+1))] 50 concurrent requests (curl)... "
 success_count=0
 for i in {1..50}; do
     curl -s "$BASE_URL/" > /dev/null 2>&1 &
 done
 wait
 sleep 0.5
-# Verificar se servidor ainda responde
+# Check if server still responds
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC} (servidor não responde)"
+    echo -e "${RED}✗ FAILED${NC} (server not responding)"
     ((failed++))
 fi
 ((total++))
 
-# Teste 2.2: 100 requisições concorrentes mistas
-echo -n "  [$((total+1))] 100 requisições mistas (GET/HEAD)... "
+# Test 2.2: 100 mixed concurrent requests (GET/HEAD)
+echo -n "  [$((total+1))] 100 mixed requests (GET/HEAD)... "
 for i in {1..50}; do
     curl -s "$BASE_URL/index.html" > /dev/null 2>&1 &
     curl -s -I "$BASE_URL/test_files/test.css" > /dev/null 2>&1 &
@@ -316,39 +316,39 @@ done
 wait
 sleep 0.5
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 2.3: Apache Bench - Alta concorrência
+# Test 2.3: Apache Bench - High concurrency
 if command -v ab &> /dev/null; then
-    echo -n "  [$((total+1))] Apache Bench: 10000 requisições, 100 concorrentes... "
+    echo -n "  [$((total+1))] Apache Bench: 10000 requests, 100 concurrent... "
     ab_output=$(ab -n 10000 -c 100 -q "$BASE_URL/" 2>&1)
     failed_requests=$(echo "$ab_output" | grep "Failed requests:" | awk '{print $3}')
     
     if [ "$failed_requests" = "0" ]; then
-        echo -e "${GREEN}✓ PASSOU${NC} (0 falhas)"
+        echo -e "${GREEN}✓ PASSED${NC} (0 failures)"
         ((passed++))
     else
-        echo -e "${RED}✗ FALHOU${NC} ($failed_requests falhas)"
+        echo -e "${RED}✗ FAILED${NC} ($failed_requests failures)"
         ((failed++))
     fi
     ((total++))
     
-    # Extrair e mostrar estatísticas
+    # Extract and show statistics
     rps=$(echo "$ab_output" | grep "Requests per second:" | awk '{print $4}')
     echo -e "    ${YELLOW}→ Requests/sec: $rps${NC}"
 else
-    echo -e "  ${YELLOW}⚠ Teste AB pulado (não instalado)${NC}"
+    echo -e "  ${YELLOW}⚠ Apache Bench test skipped (not installed)${NC}"
 fi
 
-# Teste 2.4: Múltiplos clientes wget em paralelo
+# Test 2.4: Multiple wget clients in parallel
 if command -v wget &> /dev/null; then
-    echo -n "  [$((total+1))] 20 clientes wget paralelos... "
+    echo -n "  [$((total+1))] 20 parallel wget clients... "
     temp_dir=$(mktemp -d)
     
     for i in {1..20}; do
@@ -364,17 +364,17 @@ if command -v wget &> /dev/null; then
     rm -rf "$temp_dir"
     
     if [ "$downloaded" -eq 20 ]; then
-        echo -e "${GREEN}✓ PASSOU${NC} (20/20 downloads)"
+        echo -e "${GREEN}✓ PASSED${NC} (20/20 downloads)"
         ((passed++))
     else
-        echo -e "${RED}✗ FALHOU${NC} ($downloaded/20 downloads)"
+        echo -e "${RED}✗ FAILED${NC} ($downloaded/20 downloads)"
         ((failed++))
     fi
     ((total++))
 fi
 
-# Teste 2.5: Stress test com requisições a ficheiros diferentes
-echo -n "  [$((total+1))] Stress: 200 requisições a ficheiros diferentes... "
+# Test 2.5: Stress test with requests to different files
+echo -n "  [$((total+1))] Stress: 200 requests to different files... "
 for i in {1..200}; do
     file=$((i % 5))
     case $file in
@@ -388,10 +388,10 @@ done
 wait
 sleep 0.5
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
@@ -399,39 +399,39 @@ fi
 echo ""
 
 #############################################
-# TESTES DE SINCRONIZAÇÃO E INTEGRIDADE
+# SYNCHRONIZATION AND INTEGRITY TESTS
 #############################################
-echo -e "${BLUE}=== 3. TESTES DE SINCRONIZAÇÃO ===${NC}"
+echo -e "${BLUE}=== 3. SYNCHRONIZATION TESTS ===${NC}"
 
-# Teste 3.1: Integridade do log (verificar que entradas não se sobrepõem)
-echo -n "  [$((total+1))] Integridade do ficheiro de log... "
+# Test 3.1: Log file integrity (check entries do not overlap)
+echo -n "  [$((total+1))] Log file integrity... "
 log_file="access.log"
 if [ -f "$log_file" ]; then
-    # Fazer várias requisições
+    # Make several requests
     for i in {1..20}; do
         curl -s "$BASE_URL/" > /dev/null 2>&1 &
     done
     wait
     sleep 1
     
-    # Verificar se cada linha tem formato correto [YYYY-MM-DD HH:MM:SS]
+    # Check if each line has correct format [YYYY-MM-DD HH:MM:SS]
     invalid_lines=$(grep -v "^\[20[0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]\]" "$log_file" | grep -v "=====" | wc -l)
     
     if [ "$invalid_lines" -eq 0 ]; then
-        echo -e "${GREEN}✓ PASSOU${NC} (formato correto)"
+        echo -e "${GREEN}✓ PASSED${NC} (correct format)"
         ((passed++))
     else
-        echo -e "${YELLOW}⚠ AVISO${NC} ($invalid_lines linhas com formato inesperado)"
-        ((passed++)) # Não falhar por isto
+        echo -e "${YELLOW}⚠ WARNING${NC} ($invalid_lines lines with unexpected format)"
+        ((passed++)) # Do not fail for this
     fi
 else
-    echo -e "${YELLOW}⚠ Log não encontrado${NC}"
+    echo -e "${YELLOW}⚠ Log not found${NC}"
     ((passed++))
 fi
 ((total++))
 
-# Teste 3.2: Cache hit consistency (requisitar o mesmo ficheiro várias vezes)
-echo -n "  [$((total+1))] Consistência da cache (100 requisições ao mesmo ficheiro)... "
+# Test 3.2: Cache hit consistency (request same file multiple times)
+echo -n "  [$((total+1))] Cache consistency (100 requests to same file)... "
 errors=0
 for i in {1..100}; do
     result=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/test_files/test.html")
@@ -441,33 +441,33 @@ for i in {1..100}; do
 done
 
 if [ $errors -eq 0 ]; then
-    echo -e "${GREEN}✓ PASSOU${NC} (0 erros)"
+    echo -e "${GREEN}✓ PASSED${NC} (0 errors)"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC} ($errors erros)"
+    echo -e "${RED}✗ FAILED${NC} ($errors errors)"
     ((failed++))
 fi
 ((total++))
 
-# Teste 3.3: Estatísticas (verificar se há resposta)
-echo -n "  [$((total+1))] Sistema de estatísticas funcional... "
-# Fazer algumas requisições
+# Test 3.3: Statistics system (check if response exists)
+echo -n "  [$((total+1))] Statistics system functional... "
+# Make some requests
 for i in {1..10}; do
     curl -s "$BASE_URL/" > /dev/null 2>&1
 done
 sleep 2
-# Não podemos verificar as stats diretamente, mas podemos verificar se o servidor ainda funciona
+# We cannot check stats directly, but we can check if server still works
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC} (servidor operacional)"
+    echo -e "${GREEN}✓ PASSED${NC} (server operational)"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 3.4: Race condition test - requisições simultâneas ao mesmo recurso
-echo -n "  [$((total+1))] Race conditions: 50 requisições simultâneas ao mesmo ficheiro... "
+# Test 3.4: Race condition test - simultaneous requests to same resource
+echo -n "  [$((total+1))] Race conditions: 50 simultaneous requests to same file... "
 errors=0
 for i in {1..50}; do
     curl -s "$BASE_URL/test_files/test.css" > /dev/null 2>&1 &
@@ -475,10 +475,10 @@ done
 wait
 sleep 0.5
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
@@ -486,12 +486,12 @@ fi
 echo ""
 
 #############################################
-# TESTES DE STRESS E ESTABILIDADE
+# STRESS AND STABILITY TESTS
 #############################################
-echo -e "${BLUE}=== 4. TESTES DE STRESS ===${NC}"
+echo -e "${BLUE}=== 4. STRESS TESTS ===${NC}"
 
-# Teste 4.1: Carga sustentada por 30 segundos
-echo -n "  [$((total+1))] Carga sustentada (30 segundos)... "
+# Test 4.1: Sustained load for 30 seconds
+echo -n "  [$((total+1))] Sustained load (30 seconds)... "
 end_time=$((SECONDS + 30))
 request_count=0
 while [ $SECONDS -lt $end_time ]; do
@@ -502,16 +502,16 @@ done
 wait
 sleep 1
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC} ($request_count requisições)"
+    echo -e "${GREEN}✓ PASSED${NC} ($request_count requests)"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 4.2: Picos de tráfego (burst)
-echo -n "  [$((total+1))] Picos de tráfego (3 bursts de 100 requisições)... "
+# Test 4.2: Traffic spikes (bursts)
+echo -n "  [$((total+1))] Traffic spikes (3 bursts of 100 requests)... "
 for burst in {1..3}; do
     for i in {1..100}; do
         curl -s "$BASE_URL/" > /dev/null 2>&1 &
@@ -520,16 +520,16 @@ for burst in {1..3}; do
     sleep 2
 done
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 4.3: Mix de requisições válidas e inválidas
-echo -n "  [$((total+1))] Mix de requisições (válidas + 404 + 501)... "
+# Test 4.3: Mix of valid and invalid requests
+echo -n "  [$((total+1))] Request mix (valid + 404 + 501)... "
 for i in {1..30}; do
     curl -s "$BASE_URL/" > /dev/null 2>&1 &
     curl -s "$BASE_URL/naoexiste$i.html" > /dev/null 2>&1 &
@@ -538,17 +538,17 @@ done
 wait
 sleep 1
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 4.4: Ficheiros de tamanhos variados
-echo -n "  [$((total+1))] Ficheiros de tamanhos variados... "
-# Criar ficheiros pequenos, médios e grandes
+# Test 4.4: Files of various sizes
+echo -n "  [$((total+1))] Various file sizes... "
+# Create small, medium, and large files
 echo "small" > www/test_files/small.txt
 dd if=/dev/zero of=www/test_files/medium.bin bs=1K count=100 2>/dev/null
 dd if=/dev/zero of=www/test_files/large.bin bs=1K count=1000 2>/dev/null
@@ -561,99 +561,99 @@ done
 wait
 sleep 1
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 4.5: Teste de estabilidade - verificar processos
-echo -n "  [$((total+1))] Verificação de processos (sem zombies)... "
+# Test 4.5: Stability test - check processes
+echo -n "  [$((total+1))] Process check (no zombies)... "
 zombie_count=$(ps aux | grep defunct | grep -v grep | wc -l)
 if [ $zombie_count -eq 0 ]; then
-    echo -e "${GREEN}✓ PASSOU${NC} (0 zombies)"
+    echo -e "${GREEN}✓ PASSED${NC} (0 zombies)"
     ((passed++))
 else
-    echo -e "${YELLOW}⚠ AVISO${NC} ($zombie_count processos zombie)"
-    ((passed++)) # Não falhar, apenas avisar
+    echo -e "${YELLOW}⚠ WARNING${NC} ($zombie_count zombie processes)"
+    ((passed++)) # Don't fail, just warn
 fi
 ((total++))
 
 echo ""
 
 #############################################
-# TESTES ADICIONAIS DE EDGE CASES
+# EDGE CASE TESTS
 #############################################
-echo -e "${BLUE}=== 5. TESTES DE EDGE CASES ===${NC}"
+echo -e "${BLUE}=== 5. EDGE CASE TESTS ===${NC}"
 
-# Teste 5.1: Requisição com URL muito longa
-echo -n "  [$((total+1))] URL extremamente longa... "
+# Test 5.1: Very long URL request
+echo -n "  [$((total+1))] Extremely long URL... "
 long_url="$BASE_URL/"$(printf 'a%.0s' {1..1000})".html"
 result=$(curl -s -o /dev/null -w "%{http_code}" "$long_url")
 if [ "$result" = "404" ] || [ "$result" = "414" ]; then
-    echo -e "${GREEN}✓ PASSOU${NC} (tratado corretamente)"
+    echo -e "${GREEN}✓ PASSED${NC} (handled correctly)"
     ((passed++))
 else
-    echo -e "${YELLOW}⚠ AVISO${NC} (código: $result)"
+    echo -e "${YELLOW}⚠ WARNING${NC} (code: $result)"
     ((passed++))
 fi
 ((total++))
 
-# Teste 5.2: Múltiplas requisições HEAD
-echo -n "  [$((total+1))] 50 requisições HEAD concorrentes... "
+# Test 5.2: Multiple HEAD requests
+echo -n "  [$((total+1))] 50 concurrent HEAD requests... "
 for i in {1..50}; do
     curl -s -I "$BASE_URL/" > /dev/null 2>&1 &
 done
 wait
 sleep 0.5
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
 
-# Teste 5.3: Path traversal (segurança básica)
-echo -n "  [$((total+1))] Tentativa de path traversal (/../)... "
+# Test 5.3: Path traversal (basic security)
+echo -n "  [$((total+1))] Path traversal attempt (/../)... "
 result=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/../etc/passwd")
 if [ "$result" = "404" ] || [ "$result" = "403" ]; then
-    echo -e "${GREEN}✓ PASSOU${NC} (bloqueado)"
+    echo -e "${GREEN}✓ PASSED${NC} (blocked)"
     ((passed++))
 else
-    echo -e "${YELLOW}⚠ AVISO${NC} (código: $result)"
+    echo -e "${YELLOW}⚠ WARNING${NC} (code: $result)"
     ((passed++))
 fi
 ((total++))
 
-# Teste 5.4: Ficheiro com espaços no nome
+# Test 5.4: File with spaces in name
 echo "test content" > "www/test_files/file with spaces.txt"
-echo -n "  [$((total+1))] Ficheiro com espaços no nome... "
+echo -n "  [$((total+1))] File with spaces in name... "
 result=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/test_files/file%20with%20spaces.txt")
 if [ "$result" = "200" ]; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${YELLOW}⚠ AVISO${NC} (código: $result)"
+    echo -e "${YELLOW}⚠ WARNING${NC} (code: $result)"
     ((passed++))
 fi
 ((total++))
 
-# Teste 5.5: Conexão rápida (conexão e desconexão imediata)
-echo -n "  [$((total+1))] 20 conexões rápidas (connect/disconnect)... "
+# Test 5.5: Fast connections (connect and disconnect immediately)
+echo -n "  [$((total+1))] 20 fast connections (connect/disconnect)... "
 for i in {1..20}; do
     timeout 0.1 curl -s "$BASE_URL/" > /dev/null 2>&1 &
 done
 wait
 sleep 1
 if curl -s --connect-timeout 3 "$BASE_URL/" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ PASSOU${NC}"
+    echo -e "${GREEN}✓ PASSED${NC}"
     ((passed++))
 else
-    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}✗ FAILED${NC}"
     ((failed++))
 fi
 ((total++))
@@ -661,15 +661,15 @@ fi
 echo ""
 
 #############################################
-# RELATÓRIO FINAL
+# FINAL REPORT
 #############################################
 echo "=========================================="
-echo -e "${BLUE}  RELATÓRIO FINAL${NC}"
+echo -e "${BLUE}  FINAL REPORT${NC}"
 echo "=========================================="
 echo ""
-echo "Total de testes executados: $total"
-echo -e "Testes passados: ${GREEN}$passed${NC}"
-echo -e "Testes falhados: ${RED}$failed${NC}"
+echo "Total tests executed: $total"
+echo -e "Tests passed: ${GREEN}$passed${NC}"
+echo -e "Tests failed: ${RED}$failed${NC}"
 
 if [ $failed -eq 0 ]; then
     success_rate=100
@@ -677,26 +677,26 @@ else
     success_rate=$((passed * 100 / total))
 fi
 
-echo -e "Taxa de sucesso: ${YELLOW}${success_rate}%${NC}"
+echo -e "Success rate: ${YELLOW}${success_rate}%${NC}"
 echo ""
 
-echo -e "${RED}Warning: I'm cleaning..."
+echo -e "${RED}Warning: Cleaning up..."
 rm -r www/test_files
 rm -r www/testdir
 
 if [ $failed -eq 0 ]; then
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}  ✓ TODOS OS TESTES PASSARAM!${NC}"
+    echo -e "${GREEN}  ✓ ALL TESTS PASSED!${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     exit 0
 elif [ $success_rate -ge 90 ]; then
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}  ⚠ Maioria dos testes passou (≥90%)${NC}"
+    echo -e "${YELLOW}  ⚠ Most tests passed (≥90%)${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     exit 0
 else
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${RED}  ✗ Alguns testes críticos falharam${NC}"
+    echo -e "${RED}  ✗ Some critical tests failed${NC}"
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     exit 1
 fi
