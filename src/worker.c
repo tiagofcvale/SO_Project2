@@ -75,7 +75,7 @@ void worker_main(int listen_fd) {
                ntohs(client_addr.sin_port));
 
         // mandar o socket para uma thread deste worker
+        // Se falhar (retorna -1), o socket já foi fechado pelo thread_pool_add
         thread_pool_add(&pool, client_socket);
-        // a thread é que faz http_handle_request() e close()
     }
 }
