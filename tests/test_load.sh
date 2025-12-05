@@ -108,26 +108,7 @@ echo ""
 
 #############################################
 # FUNCTIONAL TESTS
-#############################################
-echo -e "${BLUE}=== 1. FUNCTIONAL TESTS ===${NC}"
-
-# Test 1.1: GET / (default index)
-test_request "GET / (redirect to index.html)" "$BASE_URL/" "200"
-
-# Test 1.2: GET /index.html explicit
-test_request "GET /index.html explicit" "$BASE_URL/index.html" "200"
-
-# Test 1.3: HEAD / (headers only)
-echo -n "  [$((total+1))] HEAD / (headers only)... "
-response=$(curl -s -I "$BASE_URL/")
-if echo "$response" | grep -q "HTTP/1.1 200 OK" && ! echo "$response" | grep -q "<html>"; then
-    echo -e "${GREEN}✓ PASSED${NC}"
-    ((passed++))
-else
-    echo -e "${RED}✗ FAILED${NC}"
-    ((failed++))
-fi
-((total++))
+.7
 
 # Test 1.4: HEAD /index.html
 echo -n "  [$((total+1))] HEAD /index.html... "
