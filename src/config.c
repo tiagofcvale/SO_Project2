@@ -6,17 +6,7 @@
 #include "config.h"
 
 // Server configuration
-static server_config_t config = {
-    .port = 8080,
-    .document_root = "www",
-    .num_workers = 4,
-    .threads_per_worker = 10,
-    .max_queue_size = 100,
-    .log_file = "access.log",
-    .cache_size_mb = 10,
-    .timeout_seconds = 30
-};
-
+static server_config_t config;
 
 
 /**
