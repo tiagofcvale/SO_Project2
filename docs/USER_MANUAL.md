@@ -9,7 +9,7 @@ Tiago Francisco Crespo do Vale
 
 If repository is online and public: 
 
-- type on terminal: git clone https://github.com/tiagofcvale/SO_Project2
+- type on txerminal: git clone https://github.com/tiagofcvale/SO_Project2
 
 - type on terminal: cd SO_Project2
 
