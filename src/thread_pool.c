@@ -1,22 +1,17 @@
-#define _POSIX_C_SOURCE 200809L
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/socket.h>
 
 #include "thread_pool.h"
 #include "http.h"
 
 /**
- * @brief Removes and returns a socket from the work queue (consumer).
- * @param pool Pointer to the thread pool.
- * @return Socket descriptor taken from the queue.
+ * @brief Remove e retorna uma conexão da fila de trabalho (consumidor).
+ * @param pool Ponteiro para o pool de threads.
+ * @return Ponteiro para conexão retirada da fila.
  */
-static int queue_pop(thread_pool_t *pool) {
+static connection_t* queue_pop(thread_pool_t *pool) {
     thread_pool_queue_t *q = &pool->queue;
 
     pthread_mutex_lock(&q->mutex);
@@ -24,89 +19,65 @@ static int queue_pop(thread_pool_t *pool) {
     while (q->count == 0)
         pthread_cond_wait(&q->cond_non_empty, &q->mutex);
 
-    int fd = q->sockets[q->front];
+    connection_t* conn = q->connections[q->front];
     q->front = (q->front + 1) % WORKER_QUEUE_SIZE;
     q->count--;
 
     pthread_cond_signal(&q->cond_non_full);
     pthread_mutex_unlock(&q->mutex);
 
-    return fd;
+    return conn;
 }
 
 /**
- * @brief Function executed by each thread in the pool.
- * @param arg Pointer to the thread pool (thread_pool_t*).
- * @return NULL (never normally returns).
+ * @brief Função executada por cada thread do pool.
+ * @param arg Ponteiro para o pool de threads (thread_pool_t*).
+ * @return NULL (nunca retorna normalmente).
  */
 static void *worker_thread(void *arg) {
     thread_pool_t *pool = arg;
 
     while (1) {
-        int client_socket = queue_pop(pool);
+        connection_t* conn = queue_pop(pool);
 
-        printf("  [Thread %ld] Received socket %d\n", 
+        printf("  [Thread %ld] Recebi conexão fd=%d (HTTPS=%d)\n",
+               pthread_self(), conn->fd, conn->is_https);
 
-               pthread_self(), client_socket);
-
-        http_handle_request(client_socket);   
+        http_handle_request(conn);
     }
 
     return NULL;
 }
 
 /**
- * @brief Adds a socket to the work queue with timeout (producer).
- * @param pool Pointer to the thread pool.
- * @param client_socket Socket descriptor to add to the queue.
- * @return 0 on success, -1 if timeout/failure.
+ * @brief Adiciona uma conexão à fila de trabalho (produtor).
+ * @param pool Ponteiro para o pool de threads.
+ * @param conn Ponteiro para conexão a adicionar à fila.
  */
-int thread_pool_add(thread_pool_t *pool, int client_socket) {
+void thread_pool_add(thread_pool_t *pool, connection_t* conn) {
     thread_pool_queue_t *q = &pool->queue;
 
     pthread_mutex_lock(&q->mutex);
 
-    // Wait up to 2 seconds for space in the queue
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 2;  // 2 second timeout
+    while (q->count == WORKER_QUEUE_SIZE)
+        pthread_cond_wait(&q->cond_non_full, &q->mutex);
 
-    while (q->count == WORKER_QUEUE_SIZE) {
-        int ret = pthread_cond_timedwait(&q->cond_non_full, &q->mutex, &ts);
-        
-        if (ret == ETIMEDOUT) {
-            pthread_mutex_unlock(&q->mutex);
-            fprintf(stderr, "[WARN] Thread pool queue full - rejecting connection\n");
-            
-            // Send 503 and close socket
-            const char *resp = "HTTP/1.1 503 Service Unavailable\r\n"
-                             "Content-Type: text/plain\r\n"
-                             "Connection: close\r\n\r\n"
-                             "Server too busy\n";
-            send(client_socket, resp, strlen(resp), 0);
-            close(client_socket);
-            return -1;
-        }
-    }
-
-    q->sockets[q->rear] = client_socket;
+    q->connections[q->rear] = conn;
     q->rear = (q->rear + 1) % WORKER_QUEUE_SIZE;
     q->count++;
 
     pthread_cond_signal(&q->cond_non_empty);
     pthread_mutex_unlock(&q->mutex);
-    
-    return 0;
 }
 
 /**
- * @brief Initializes the thread pool and the internal queue.
- * @param pool Pointer to the thread pool to initialize.
- * @param n Number of threads to create in the pool.
+ * @brief Inicializa o pool de threads e a fila interna.
+ * @param pool Ponteiro para o pool de threads a inicializar.
+ * @param n Número de threads a criar no pool.
  */
 void thread_pool_init(thread_pool_t *pool, int n) {
 
-    // Initialize internal queue
+    // Inicializar queue interna
     pool->queue.front = 0;
     pool->queue.rear  = 0;
     pool->queue.count = 0;
@@ -115,7 +86,7 @@ void thread_pool_init(thread_pool_t *pool, int n) {
     pthread_cond_init(&pool->queue.cond_non_empty, NULL);
     pthread_cond_init(&pool->queue.cond_non_full, NULL);
 
-    // Create threads
+    // Criar threads
     pool->thread_count = n;
     pool->threads = malloc(sizeof(pthread_t) * n);
 
@@ -123,5 +94,5 @@ void thread_pool_init(thread_pool_t *pool, int n) {
         pthread_create(&pool->threads[i], NULL, worker_thread, pool);
     }
 
-    printf("Worker process created %d threads.\n", n);
+    printf("Worker process criou %d threads.\n", n);
 }

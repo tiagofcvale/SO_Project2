@@ -4,27 +4,72 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 #include "config.h"
 #include "worker.h"
 #include "thread_pool.h"
 #include "shared_mem.h"
 #include "semaphores.h"
 
-
 /**
- * @brief Global pointer to shared memory, accessible by other modules.
+ * @brief Ponteiro global para a memória partilhada, acessível por outros módulos.
  */
 shared_data_t* shm_data = NULL;
 
 /**
- * @brief Global structure with the IPC semaphores used by the worker.
+ * @brief Estrutura global com os semáforos IPC usados pelo worker.
  */
 ipc_semaphores_t sems;
 
 /**
- * @brief Main function of the worker process. Attaches to shared memory, opens semaphores,
- *        creates the thread pool, and accepts client connections, distributing them to threads.
- * @param listen_fd File descriptor of the listening socket (accepts new TCP connections).
+ * @brief SSL context global para este worker
+ */
+static SSL_CTX *ssl_ctx = NULL;
+
+/**
+ * @brief Inicializa OpenSSL e carrega certificados
+ * @return 0 em sucesso, -1 em erro
+ */
+static int init_ssl_context(void) {
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+
+    ssl_ctx = SSL_CTX_new(TLS_server_method());
+    if (!ssl_ctx) {
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
+
+    // Carregar certificado e chave privada
+    if (SSL_CTX_use_certificate_file(ssl_ctx, "localhost.pem", SSL_FILETYPE_PEM) <= 0) {
+        fprintf(stderr, "Worker %d: Failed to load certificate\n", getpid());
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
+
+    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, "localhost-key.pem", SSL_FILETYPE_PEM) <= 0) {
+        fprintf(stderr, "Worker %d: Failed to load private key\n", getpid());
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
+
+    // Verificar se a chave privada corresponde ao certificado
+    if (!SSL_CTX_check_private_key(ssl_ctx)) {
+        fprintf(stderr, "Worker %d: Private key does not match certificate\n", getpid());
+        return -1;
+    }
+
+    printf("Worker %d: SSL initialized successfully.\n", getpid());
+    return 0;
+}
+
+/**
+ * @brief Função principal do processo worker. Liga-se à memória partilhada, abre os semáforos,
+ *        cria o pool de threads e aceita ligações de clientes, distribuindo-as pelas threads.
+ * @param listen_fd File descriptor do socket de escuta (aceita novas ligações TCP).
  */
 void worker_main(int listen_fd) {
     // Attach to shared memory created by master
@@ -48,17 +93,23 @@ void worker_main(int listen_fd) {
         exit(1);
     }
 
-    // create this worker's local thread pool
+    // Inicializar SSL
+    if (init_ssl_context() < 0) {
+        fprintf(stderr, "Worker %d: SSL initialization failed, continuing without HTTPS\n", getpid());
+        ssl_ctx = NULL; // Continuar sem SSL
+    }
+
+    // criar thread pool local deste worker
     thread_pool_t pool;
     thread_pool_init(&pool, get_threads_per_worker());
 
-    printf("Worker %d iniciated.\n", getpid());
+    printf("Worker %d iniciado.\n", getpid());
 
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t len = sizeof(client_addr);
 
-        // each worker does accept() directly
+        // cada worker faz accept() directamente
         int client_socket = accept(listen_fd,
                                    (struct sockaddr *)&client_addr,
                                    &len);
@@ -68,14 +119,57 @@ void worker_main(int listen_fd) {
             continue;
         }
 
-        printf("Worker %d receive socket %d from %s:%d\n",
+        printf("Worker %d recebeu socket %d de %s:%d\n",
                getpid(),
                client_socket,
                inet_ntoa(client_addr.sin_addr),
                ntohs(client_addr.sin_port));
 
-        // send the socket to a thread of this worker
-        // If it fails (returns -1), the socket has already been closed by thread_pool_add
-        thread_pool_add(&pool, client_socket);
+        // Criar estrutura de conexão
+        connection_t *conn = malloc(sizeof(connection_t));
+        if (!conn) {
+            perror("malloc connection");
+            close(client_socket);
+            continue;
+        }
+
+        conn->fd = client_socket;
+        conn->ssl = NULL;
+        conn->is_https = 0;
+
+        // Se SSL está disponível, tentar fazer handshake
+        if (ssl_ctx != NULL) {
+            SSL *ssl = SSL_new(ssl_ctx);
+            if (ssl) {
+                SSL_set_fd(ssl, client_socket);
+
+                // Tentar handshake SSL (não bloqueante, falha se for HTTP normal)
+                int ret = SSL_accept(ssl);
+                if (ret > 0) {
+                    // Sucesso - é uma conexão HTTPS
+                    conn->ssl = ssl;
+                    conn->is_https = 1;
+                    printf("Worker %d: HTTPS connection established\n", getpid());
+                } else {
+                    // Falhou - provavelmente é HTTP normal
+                    int err = SSL_get_error(ssl, ret);
+                    if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
+                        // Não é erro temporário, assumir HTTP normal
+                        SSL_free(ssl);
+                        conn->ssl = NULL;
+                        conn->is_https = 0;
+                        printf("Worker %d: HTTP connection (SSL handshake failed, treating as plain HTTP)\n", getpid());
+                    }
+                }
+            }
+        }
+
+        // mandar a conexão para uma thread deste worker
+        thread_pool_add(&pool, conn);
+    }
+
+    // Cleanup (nunca chega aqui no loop infinito, mas boa prática)
+    if (ssl_ctx) {
+        SSL_CTX_free(ssl_ctx);
     }
 }

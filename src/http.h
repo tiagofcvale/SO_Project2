@@ -2,8 +2,9 @@
 #define HTTP_H
 
 #include <stddef.h>
+#include "worker.h"  // Para connection_t
 
-// Structure with the relevant fields of the HTTP request
+// Estrutura com os campos relevantes do pedido HTTP
 typedef struct {
     char method[8];
     char path[1024];
@@ -17,7 +18,8 @@ typedef struct {
 } http_request_t;
 
 
-// Main function called by each worker thread
-void http_handle_request(int client_socket);
+// Função principal chamada pelas threads de cada worker
+// Agora recebe connection_t em vez de int
+void http_handle_request(connection_t* conn);
 
 #endif

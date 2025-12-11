@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -pthread -D_POSIX_C_SOURCE=200809L -g -Isrc
-LDFLAGS = -pthread -lrt
+LDFLAGS = -pthread -lrt -lssl -lcrypto
 
 # Diretórios
 SRC_DIR = src

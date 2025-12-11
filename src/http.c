@@ -9,6 +9,9 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <sys/sendfile.h>
 
 #include "http.h"
 #include "config.h"
@@ -52,6 +55,41 @@ static const char* mime_from_path(const char* path) {
     return "application/octet-stream";
 }
 
+/**
+ * @brief Lê dados de uma conexão (HTTP ou HTTPS)
+ */
+static ssize_t conn_read(connection_t* conn, void* buf, size_t len) {
+    if (conn->is_https && conn->ssl) {
+        return SSL_read(conn->ssl, buf, len);
+    } else {
+        return recv(conn->fd, buf, len, 0);
+    }
+}
+
+/**
+ * @brief Escreve dados numa conexão (HTTP ou HTTPS)
+ */
+static ssize_t conn_write(connection_t* conn, const void* buf, size_t len) {
+    if (conn->is_https && conn->ssl) {
+        return SSL_write(conn->ssl, buf, len);
+    } else {
+        return send(conn->fd, buf, len, 0);
+    }
+}
+
+/**
+ * @brief Fecha uma conexão e liberta recursos
+ */
+static void conn_close(connection_t* conn) {
+    if (conn->is_https && conn->ssl) {
+        SSL_shutdown(conn->ssl);
+        SSL_free(conn->ssl);
+    }
+    close(conn->fd);
+    free(conn);
+}
+
+
 
 /**
  * @brief Reads a line from the socket non-blocking, until '\n' or reaching the maximum.
@@ -60,23 +98,23 @@ static const char* mime_from_path(const char* path) {
  * @param max Maximum buffer size.
  * @return Number of bytes read, or -1 on error.
  */
-static int read_line(int fd, char* buf, int max) {
+static int read_line_conn(connection_t* conn, char* buf, int max) {
     int i = 0;
     char c;
 
     while (i < max - 1) {
-        int n = recv(fd, &c, 1, 0);
+        int n = conn_read(conn, &c, 1);
 
         if (n == 0) {
-            // client closed the connection
+            // cliente fechou a ligação
             break;
         }
 
         if (n < 0) {
-            // system interruptions → try again
+            // interrupções do sistema → tentar de novo
             if (errno == EINTR) continue;
 
-            // socket has no data yet → try again
+            // socket não tem dados ainda → tentar de novo
             if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
 
             return -1;
@@ -99,30 +137,30 @@ static int read_line(int fd, char* buf, int max) {
  * @param req Structure where the request data will be stored.
  * @return 0 on success, -1 on error.
  */
-static int parse_request(int client_fd, http_request_t* req) {
+static int parse_request_conn(connection_t* conn, http_request_t* req) {
     char line[MAX_REQ_LINE];
 
-    printf("[PARSE] Reading request ...\n");
+    printf("[PARSE] A ler request...\n");
 
-    // First line
-    int n = read_line(client_fd, line, sizeof(line));
+    // Primeira linha
+    int n = read_line_conn(conn, line, sizeof(line));
     printf("[PARSE] First line raw: '%s' (n=%d)\n", line, n);
 
     if (n <= 0) return -1;
 
     sscanf(line, "%7s %1023s %15s", req->method, req->path, req->version);
-    printf("[PARSE] Method='%s' Path='%s' Version='%s'\n",
+    printf("[PARSE] Método='%s' Path='%s' Versão='%s'\n",
            req->method, req->path, req->version);
 
     // Headers
     while (1) {
-        n = read_line(client_fd, line, sizeof(line));
+        n = read_line_conn(conn, line, sizeof(line));
         printf("[PARSE] Header line: '%s' (n=%d)\n", line, n);
 
         if (n <= 0) return -1;
 
         if (!strcmp(line, "\r\n")) {
-            printf("[PARSE] End of headers\n");
+            printf("[PARSE] Fim dos headers\n");
             break;
         }
 
@@ -143,8 +181,7 @@ static int parse_request(int client_fd, http_request_t* req) {
  * @param code HTTP error code (e.g., 404, 500).
  * @param msg Message associated with the error.
  */
-static void send_error_page(int fd, int code, const char* msg) {
-
+static void send_error_page_conn(connection_t* conn, int code, const char* msg) {
     char errpath[256];
     snprintf(errpath, sizeof(errpath), "%s/errors/%d.html",
              get_document_root(), code);
@@ -165,16 +202,15 @@ static void send_error_page(int fd, int code, const char* msg) {
             code, msg, st.st_size
         );
 
-        send(fd, header, h, 0);
+        conn_write(conn, header, h);
 
         char buf[4096];
         ssize_t n;
         while ((n = read(f, buf, sizeof(buf))) > 0)
-            send(fd, buf, n, 0);
+            conn_write(conn, buf, n);
 
         close(f);
         
-        // Update stats for error responses
         if (shm_data) {
             stats_update(&shm_data->stats, sems.sem_stats, code, st.st_size);
         }
@@ -197,15 +233,13 @@ static void send_error_page(int fd, int code, const char* msg) {
         code, msg, blen
     );
 
-    send(fd, header, h, 0);
-    send(fd, body, blen, 0);
+    conn_write(conn, header, h);
+    conn_write(conn, body, blen);
     
-    // Update stats for fallback error responses
     if (shm_data) {
         stats_update(&shm_data->stats, sems.sem_stats, code, blen);
     }
 }
-
 
 
 /**
@@ -214,7 +248,7 @@ static void send_error_page(int fd, int code, const char* msg) {
  * @param fullpath Absolute path of the file to serve.
  * @param is_head If 1, sends only headers (HEAD method), if 0 sends body as well (GET).
  */
-static void serve_file(int fd, const char *fullpath, int is_head) {
+static void serve_file_conn(connection_t* conn, const char *fullpath, int is_head) {
 
     printf("[SERVE] fullpath='%s', is_head=%d\n", fullpath, is_head);
 
@@ -223,32 +257,27 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
 
     if (cache_get(fullpath, &cached_data, &cached_size)) {
 
-        const char* mime = mime_from_path(fullpath);
+    const char* mime = mime_from_path(fullpath);
 
-        char header[256];
-        int h = snprintf(header, sizeof(header),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: %s\r\n"
-            "Content-Length: %zu\r\n"
-            "Connection: close\r\n"
-            "\r\n",
-            mime, cached_size
-        );
+    char header[256];
+    int h = snprintf(header, sizeof(header),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %zu\r\n"
+        "Connection: keep-alive\r\n\r\n",
+        mime, cached_size
+    );
 
-        send(fd, header, h, 0);
-        
-        // If HEAD, do not send the body
-        if (!is_head) {
-            send(fd, cached_data, cached_size, 0);
-        }
-        
-        // Update stats - cache hit! (status 200)
-        if (shm_data) {
-            stats_update(&shm_data->stats, sems.sem_stats, 200, cached_size);
-        }
-        
-        return;
+    // Enviar cabeçalho
+    conn_write(conn, header, h);
+
+    // Se for HEAD, não enviar corpo
+    if (!is_head) {
+        conn_write(conn, cached_data, cached_size);
     }
+
+    return;
+}
 
     // Cache miss - no specific tracking needed, just counted in final stats
 
@@ -256,16 +285,16 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
     printf("[SERVE] open() file_fd=%d\n", file_fd);
 
     if (file_fd < 0) {
-        send_error_page(fd, 500, "Internal Server Error");
-        return;
-    }
+    send_error_page_conn(conn, 500, "Internal Server Error");
+    return;
+}
 
-    struct stat st;
-    if (stat(fullpath, &st) < 0) {
-        close(file_fd);
-        send_error_page(fd, 500, "Internal Server Error");
-        return;
-    }
+struct stat st;
+if (stat(fullpath, &st) < 0) {
+    close(file_fd);
+    send_error_page_conn(conn, 500, "Internal Server Error");
+    return;
+}
 
     const char* mime = mime_from_path(fullpath);
 
@@ -281,16 +310,16 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
     printf("[SERVE] header sent (%d bytes)\n", h);
 
 
-    send(fd, header, h, 0);
+    conn_write(conn, header, h);
 
-    // If HEAD, do not send the body
-    if (is_head) {
-        close(file_fd);
-        if (shm_data) {
-            stats_update(&shm_data->stats, sems.sem_stats, 200, 0);
+    if (!is_head) {
+        ssize_t n = sendfile(conn->fd, file_fd, NULL, st.st_size);
+        if (n < 0) {
+            send_error_page_conn(conn, 500, "Internal Server Error");
         }
-        return;
     }
+
+    close(file_fd);
 
     printf("[SERVE] file sent (%ld bytes)\n", st.st_size);
 
@@ -302,9 +331,9 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
         ssize_t n;
         size_t total_sent = 0;
         while ((n = read(file_fd, buf, sizeof(buf))) > 0) {
-            send(fd, buf, n, 0);
-            total_sent += n;
+            conn_write(conn, buf, n);
         }
+
 
         close(file_fd);
         
@@ -321,11 +350,13 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
 
     if (total != st.st_size) {
         free(file_data);
-        send_error_page(fd, 500, "Internal Server Error");
+        send_error_page_conn(conn, 500, "Internal Server Error");
+
         return;
     }
 
-    send(fd, file_data, st.st_size, 0);
+    conn_write(conn, file_data, st.st_size);
+
 
     cache_put(fullpath, file_data, st.st_size);
 
@@ -343,47 +374,35 @@ static void serve_file(int fd, const char *fullpath, int is_head) {
  *        Parses, validates, serves files, and logs statistics.
  * @param client_socket Client socket descriptor.
  */
-void http_handle_request(int client_socket) {
-
-    printf("[HTTP] Enter in http_handle_request with socket %d\n", client_socket);
-
-    struct timeval timeout;
-    timeout.tv_sec = 5;   // 5 second timeout
-    timeout.tv_usec = 0;
-    
-    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-        perror("setsockopt SO_RCVTIMEO");
-    }
-    
-    if (setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-        perror("setsockopt SO_SNDTIMEO");
-    }
+void http_handle_request(connection_t* conn) {
+    printf("[HTTP] Entrou no http_handle_request com fd %d (HTTPS=%d)\n", 
+           conn->fd, conn->is_https);
 
     http_request_t req = {0};
 
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
-    getpeername(client_socket, (struct sockaddr *)&addr, &addrlen);
+    getpeername(conn->fd, (struct sockaddr *)&addr, &addrlen);
     snprintf(req.client_ip, sizeof(req.client_ip),
              "%s", inet_ntoa(addr.sin_addr));
 
-    if (parse_request(client_socket, &req) < 0) {
-        send_error_page(client_socket, 400, "Bad Request");
+    if (parse_request_conn(conn, &req) < 0) {
+        send_error_page_conn(conn, 400, "Bad Request");
         logger_log(req.client_ip, "-", "-", 400, 0);
-        close(client_socket);
+        conn_close(conn);
         return;
     }
 
-    // Support GET and HEAD
+    // Validar método
     int is_head = 0;
     if (strcmp(req.method, "GET") == 0) {
         is_head = 0;
     } else if (strcmp(req.method, "HEAD") == 0) {
         is_head = 1;
     } else {
-        send_error_page(client_socket, 501, "Not Implemented");
+        send_error_page_conn(conn, 501, "Not Implemented");
         logger_log(req.client_ip, req.method, req.path, 501, 0);
-        close(client_socket);
+        conn_close(conn);
         return;
     }
 
@@ -394,26 +413,23 @@ void http_handle_request(int client_socket) {
     snprintf(fullpath, sizeof(fullpath), "%s%s",
              get_document_root(), req.path);
 
-    // DEBUG: Show the full path of the requested file
-    printf("DEBUG: Looking for file: %s\n", fullpath);
-
     struct stat st;
     if (stat(fullpath, &st) < 0) {
-        send_error_page(client_socket, 404, "Not Found");
+        send_error_page_conn(conn, 404, "Not Found");
         logger_log(req.client_ip, req.method, req.path, 404, 0);
-        close(client_socket);
+        conn_close(conn);
         return;
     }
 
     if (S_ISDIR(st.st_mode)) {
-        send_error_page(client_socket, 403, "Forbidden");
+        send_error_page_conn(conn, 403, "Forbidden");
         logger_log(req.client_ip, req.method, req.path, 403, 0);
-        close(client_socket);
+        conn_close(conn);
         return;
     }
 
-    serve_file(client_socket, fullpath, is_head);
+    serve_file_conn(conn, fullpath, is_head);
     logger_log(req.client_ip, req.method, req.path, 200, st.st_size);
 
-    close(client_socket);
+    conn_close(conn);
 }
