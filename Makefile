@@ -8,10 +8,11 @@ BUILD_DIR = build
 
 TARGET = server
 
-# Ficheiros fonte na pasta src/
+# Ficheiros fonte na pasta src/ (ADICIONADO ssl.c)
 SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/master.c $(SRC_DIR)/worker.c $(SRC_DIR)/http.c \
        $(SRC_DIR)/thread_pool.c $(SRC_DIR)/cache.c $(SRC_DIR)/logger.c $(SRC_DIR)/stats.c \
-       $(SRC_DIR)/config.c $(SRC_DIR)/shared_mem.c $(SRC_DIR)/semaphores.c $(SRC_DIR)/global.c
+       $(SRC_DIR)/config.c $(SRC_DIR)/shared_mem.c $(SRC_DIR)/semaphores.c $(SRC_DIR)/global.c \
+       $(SRC_DIR)/ssl.c
 
 # Objetos na pasta build/
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
@@ -36,8 +37,8 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 # Explicit dependencies
 $(BUILD_DIR)/main.o: $(SRC_DIR)/main.c $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/stats.h $(SRC_DIR)/cache.h $(SRC_DIR)/master.h
-$(BUILD_DIR)/master.o: $(SRC_DIR)/master.c $(SRC_DIR)/master.h $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/worker.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h
-$(BUILD_DIR)/worker.o: $(SRC_DIR)/worker.c $(SRC_DIR)/worker.h $(SRC_DIR)/config.h $(SRC_DIR)/thread_pool.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h
+$(BUILD_DIR)/master.o: $(SRC_DIR)/master.c $(SRC_DIR)/master.h $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/worker.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/ssl.h
+$(BUILD_DIR)/worker.o: $(SRC_DIR)/worker.c $(SRC_DIR)/worker.h $(SRC_DIR)/config.h $(SRC_DIR)/thread_pool.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/ssl.h
 $(BUILD_DIR)/http.o: $(SRC_DIR)/http.c $(SRC_DIR)/http.h $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/cache.h $(SRC_DIR)/stats.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h
 $(BUILD_DIR)/thread_pool.o: $(SRC_DIR)/thread_pool.c $(SRC_DIR)/thread_pool.h $(SRC_DIR)/http.h
 $(BUILD_DIR)/cache.o: $(SRC_DIR)/cache.c $(SRC_DIR)/cache.h
@@ -47,6 +48,7 @@ $(BUILD_DIR)/config.o: $(SRC_DIR)/config.c $(SRC_DIR)/config.h
 $(BUILD_DIR)/shared_mem.o: $(SRC_DIR)/shared_mem.c $(SRC_DIR)/shared_mem.h $(SRC_DIR)/connection_queue.h $(SRC_DIR)/stats.h
 $(BUILD_DIR)/semaphores.o: $(SRC_DIR)/semaphores.c $(SRC_DIR)/semaphores.h
 $(BUILD_DIR)/global.o: $(SRC_DIR)/global.c $(SRC_DIR)/global.h
+$(BUILD_DIR)/ssl.o: $(SRC_DIR)/ssl.c $(SRC_DIR)/ssl.h
 
 # Create www directory structure and example pages
 setup_www:
@@ -85,6 +87,8 @@ test:
 	@curl -s -I http://localhost:8080/ > /dev/null && echo "✓ HEAD / OK" || echo "✗ HEAD / FAILED"
 	@echo "Testing 404..."
 	@curl -s http://localhost:8080/naoexiste.html | grep -q 404 && echo "✓ 404 OK" || echo "✗ 404 FAILED"
+	@echo "Testing HTTPS..."
+	@curl -sk https://localhost:8443/ > /dev/null && echo "✓ HTTPS OK" || echo "✗ HTTPS FAILED"
 	@echo "=== End of tests ==="
 
 # Load test (requires apache bench)
@@ -127,4 +131,5 @@ help:
 	@echo "  make clean      - Removes objects and executable"
 	@echo "  make distclean  - Full cleanup (includes IPC)"
 	@echo "  make help       - Shows this help"
+
 .PHONY: all run test loadtest valgrind helgrind clean distclean help setup_www

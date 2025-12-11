@@ -40,13 +40,8 @@ int main(void) {
     // 4. Start the Master (Creates SHM, Semaphores, Sockets, and Workers)
     if (master_start() != 0) {
         fprintf(stderr, "Critical error starting server.\n");
-        cache_cleanup();
-        logger_cleanup();
         return 1;
     }
-
-    // Final cleanup (only reached if master returns, which should not happen in loop)
-    cache_cleanup();
-    logger_cleanup();
+    // O master faz cleanup dos recursos, não precisa repetir aqui
     return 0;
 }

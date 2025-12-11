@@ -10,8 +10,7 @@ typedef struct {
     int is_https;    // 1 se for HTTPS, 0 se for HTTP
 } connection_t;
 
-// Cada worker recebe o listen_fd (socket de escuta) do master
-void worker_main(int listen_fd);
-int dequeue_connection(void);
+// Cada worker recebe o listen_fd (socket de escuta) e flag is_https_listener
+void worker_main(int listen_fd, int is_https_listener);
 
 #endif

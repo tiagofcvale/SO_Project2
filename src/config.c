@@ -5,8 +5,20 @@
 
 #include "config.h"
 
-// Server configuration
-static server_config_t config;
+// Server configuration with defaults
+static server_config_t config = {
+    .port = 8080,
+    .https_port = 8443,
+    .document_root = "www",
+    .num_workers = 4,
+    .threads_per_worker = 30,
+    .max_queue_size = 200,
+    .log_file = "access.log",
+    .cache_size_mb = 50,
+    .timeout_seconds = 5,
+    .ssl_cert = "cert.pem",
+    .ssl_key = "key.pem"
+};
 
 
 /**
@@ -72,6 +84,9 @@ int load_config(const char *filename) {
         if (strcmp(key, "PORT") == 0)
             config.port = atoi(value);
 
+        else if (strcmp(key, "HTTPS_PORT") == 0)
+            config.https_port = atoi(value);
+
         else if (strcmp(key, "DOCUMENT_ROOT") == 0)
             strncpy(config.document_root, value, sizeof(config.document_root)-1);
 
@@ -92,6 +107,12 @@ int load_config(const char *filename) {
 
         else if (strcmp(key, "TIMEOUT_SECONDS") == 0)
             config.timeout_seconds = atoi(value);
+
+        else if (strcmp(key, "SSL_CERT") == 0)
+            strncpy(config.ssl_cert, value, sizeof(config.ssl_cert)-1);
+
+        else if (strcmp(key, "SSL_KEY") == 0)
+            strncpy(config.ssl_key, value, sizeof(config.ssl_key)-1);
 
         else
             printf("Unknown option on line %d: %s\n", line_num, key);
@@ -117,6 +138,14 @@ const server_config_t *get_config(void) {
  */
 int get_server_port(void) {
     return config.port;
+}
+
+/**
+ * @brief Gets the HTTPS port number.
+ * @return Configured HTTPS port.
+ */
+int get_https_port(void) {
+    return config.https_port;
 }
 
 /**
@@ -173,4 +202,20 @@ int get_cache_size_mb(void) {
  */
 int get_timeout_seconds(void) {
     return config.timeout_seconds;
+}
+
+/**
+ * @brief Gets the SSL certificate path.
+ * @return String with the certificate path.
+ */
+const char *get_ssl_cert(void) {
+    return config.ssl_cert;
+}
+
+/**
+ * @brief Gets the SSL private key path.
+ * @return String with the private key path.
+ */
+const char *get_ssl_key(void) {
+    return config.ssl_key;
 }

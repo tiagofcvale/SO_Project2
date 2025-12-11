@@ -12,6 +12,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <sys/sendfile.h>
+#include <time.h>
 
 #include "http.h"
 #include "config.h"
@@ -89,11 +90,9 @@ static void conn_close(connection_t* conn) {
     free(conn);
 }
 
-
-
 /**
  * @brief Reads a line from the socket non-blocking, until '\n' or reaching the maximum.
- * @param fd Socket descriptor.
+ * @param conn Connection structure.
  * @param buf Destination buffer for the read line.
  * @param max Maximum buffer size.
  * @return Number of bytes read, or -1 on error.
@@ -130,10 +129,9 @@ static int read_line_conn(connection_t* conn, char* buf, int max) {
     return i;
 }
 
-
 /**
  * @brief Parses the HTTP request, separating method, path, and headers.
- * @param client_fd Client socket descriptor.
+ * @param conn Connection structure.
  * @param req Structure where the request data will be stored.
  * @return 0 on success, -1 on error.
  */
@@ -172,12 +170,9 @@ static int parse_request_conn(connection_t* conn, http_request_t* req) {
     return 0;
 }
 
-
-
-
 /**
  * @brief Sends a custom or generic HTTP error page to the client.
- * @param fd Client socket descriptor.
+ * @param conn Connection structure.
  * @param code HTTP error code (e.g., 404, 500).
  * @param msg Message associated with the error.
  */
@@ -241,10 +236,80 @@ static void send_error_page_conn(connection_t* conn, int code, const char* msg) 
     }
 }
 
+/**
+ * @brief Serve statistics in JSON format
+ * @param conn Connection structure
+ */
+static void serve_stats_json(connection_t* conn) {
+    char json[2048];
+    int len;
+    
+    if (shm_data) {
+        // Read stats atomically
+        sem_wait(sems.sem_stats);
+        
+        server_stats_t stats_copy = shm_data->stats;
+        
+        sem_post(sems.sem_stats);
+        
+        // Calculate cache hit rate
+        unsigned long cache_total = stats_copy.cache_hits + stats_copy.cache_misses;
+        float cache_hit_rate = cache_total > 0 ? 
+            (float)stats_copy.cache_hits / cache_total * 100.0f : 0.0f;
+        
+        len = snprintf(json, sizeof(json),
+            "{\n"
+            "  \"total_requests\": %lu,\n"
+            "  \"status_200\": %lu,\n"
+            "  \"status_404\": %lu,\n"
+            "  \"status_500\": %lu,\n"
+            "  \"bytes_served\": %lu,\n"
+            "  \"cache_hits\": %lu,\n"
+            "  \"cache_misses\": %lu,\n"
+            "  \"cache_hit_rate\": %.2f,\n"
+            "  \"timestamp\": %ld\n"
+            "}\n",
+            stats_copy.total_requests,
+            stats_copy.status_200,
+            stats_copy.status_404,
+            stats_copy.status_500,
+            stats_copy.bytes_transferred,
+            stats_copy.cache_hits,
+            stats_copy.cache_misses,
+            cache_hit_rate,
+            time(NULL)
+        );
+    } else {
+        // Fallback if shared memory is not available
+        len = snprintf(json, sizeof(json),
+            "{\n"
+            "  \"error\": \"Statistics not available\",\n"
+            "  \"message\": \"Shared memory not initialized\"\n"
+            "}\n"
+        );
+    }
+    
+    char header[256];
+    int h = snprintf(header, sizeof(header),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %d\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Cache-Control: no-cache, no-store, must-revalidate\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        len
+    );
+    
+    conn_write(conn, header, h);
+    conn_write(conn, json, len);
+    
+    printf("[API] Served /api/stats - %d bytes\n", len);
+}
 
 /**
  * @brief Serves a file to the client, using the cache if possible.
- * @param fd Client socket descriptor.
+ * @param conn Connection structure (HTTP or HTTPS)
  * @param fullpath Absolute path of the file to serve.
  * @param is_head If 1, sends only headers (HEAD method), if 0 sends body as well (GET).
  */
@@ -255,46 +320,53 @@ static void serve_file_conn(connection_t* conn, const char *fullpath, int is_hea
     char* cached_data = NULL;
     size_t cached_size = 0;
 
+    // Tentar obter do cache
     if (cache_get(fullpath, &cached_data, &cached_size)) {
+        printf("[SERVE] Cache HIT: %zu bytes\n", cached_size);
 
-    const char* mime = mime_from_path(fullpath);
+        const char* mime = mime_from_path(fullpath);
 
-    char header[256];
-    int h = snprintf(header, sizeof(header),
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: %s\r\n"
-        "Content-Length: %zu\r\n"
-        "Connection: keep-alive\r\n\r\n",
-        mime, cached_size
-    );
+        char header[256];
+        int h = snprintf(header, sizeof(header),
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: %s\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n\r\n",
+            mime, cached_size
+        );
 
-    // Enviar cabeçalho
-    conn_write(conn, header, h);
+        conn_write(conn, header, h);
 
-    // Se for HEAD, não enviar corpo
-    if (!is_head) {
-        conn_write(conn, cached_data, cached_size);
+        if (!is_head) {
+            conn_write(conn, cached_data, cached_size);
+        }
+
+        if (shm_data) {
+            stats_update(&shm_data->stats, sems.sem_stats, 200, cached_size);
+        }
+
+        return;
     }
 
-    return;
-}
-
-    // Cache miss - no specific tracking needed, just counted in final stats
+    // Cache miss - ler do disco
+    printf("[SERVE] Cache MISS - a ler do disco\n");
 
     int file_fd = open(fullpath, O_RDONLY);
     printf("[SERVE] open() file_fd=%d\n", file_fd);
 
     if (file_fd < 0) {
-    send_error_page_conn(conn, 500, "Internal Server Error");
-    return;
-}
+        send_error_page_conn(conn, 500, "Internal Server Error");
+        return;
+    }
 
-struct stat st;
-if (stat(fullpath, &st) < 0) {
-    close(file_fd);
-    send_error_page_conn(conn, 500, "Internal Server Error");
-    return;
-}
+    struct stat st;
+    if (fstat(file_fd, &st) < 0) {
+        close(file_fd);
+        send_error_page_conn(conn, 500, "Internal Server Error");
+        return;
+    }
+
+    printf("[SERVE] Tamanho do ficheiro: %ld bytes\n", st.st_size);
 
     const char* mime = mime_from_path(fullpath);
 
@@ -307,37 +379,40 @@ if (stat(fullpath, &st) < 0) {
         "\r\n",
         mime, st.st_size
     );
-    printf("[SERVE] header sent (%d bytes)\n", h);
 
-
+    printf("[SERVE] A enviar header (%d bytes)\n", h);
     conn_write(conn, header, h);
 
-    if (!is_head) {
-        ssize_t n = sendfile(conn->fd, file_fd, NULL, st.st_size);
-        if (n < 0) {
-            send_error_page_conn(conn, 500, "Internal Server Error");
+    if (is_head) {
+        // HEAD request - só header
+        close(file_fd);
+        if (shm_data) {
+            stats_update(&shm_data->stats, sems.sem_stats, 200, 0);
         }
+        return;
     }
 
-    close(file_fd);
-
-    printf("[SERVE] file sent (%ld bytes)\n", st.st_size);
-
-
+    // Ler ficheiro para memória para colocar no cache
     char* file_data = malloc(st.st_size);
     if (!file_data) {
-
+        printf("[SERVE] AVISO: Sem memória para cache, a enviar diretamente\n");
+        
+        // Fallback: enviar diretamente sem cache
         char buf[4096];
         ssize_t n;
         size_t total_sent = 0;
+        
         while ((n = read(file_fd, buf, sizeof(buf))) > 0) {
-            conn_write(conn, buf, n);
+            ssize_t written = conn_write(conn, buf, n);
+            if (written > 0) {
+                total_sent += written;
+            }
         }
-
-
+        
         close(file_fd);
         
-        // Update stats
+        printf("[SERVE] Enviado diretamente: %zu bytes\n", total_sent);
+        
         if (shm_data) {
             stats_update(&shm_data->stats, sems.sem_stats, 200, total_sent);
         }
@@ -345,22 +420,36 @@ if (stat(fullpath, &st) < 0) {
         return;
     }
 
-    ssize_t total = read(file_fd, file_data, st.st_size);
+    // Ler ficheiro completo
+    ssize_t total_read = 0;
+    ssize_t n;
+    
+    while (total_read < st.st_size) {
+        n = read(file_fd, file_data + total_read, st.st_size - total_read);
+        if (n <= 0) break;
+        total_read += n;
+    }
+    
     close(file_fd);
 
-    if (total != st.st_size) {
+    if (total_read != st.st_size) {
+        printf("[SERVE] ERRO: Lido %zd bytes, esperado %ld bytes\n", total_read, st.st_size);
         free(file_data);
         send_error_page_conn(conn, 500, "Internal Server Error");
-
         return;
     }
 
-    conn_write(conn, file_data, st.st_size);
+    printf("[SERVE] Lido do disco: %zd bytes\n", total_read);
 
+    // Enviar dados
+    ssize_t written = conn_write(conn, file_data, st.st_size);
+    printf("[SERVE] Enviado ao cliente: %zd bytes\n", written);
 
+    // Colocar no cache
     cache_put(fullpath, file_data, st.st_size);
+    printf("[SERVE] Adicionado ao cache\n");
 
-    // Update stats - successful file served (status 200)
+    // Atualizar estatísticas
     if (shm_data) {
         stats_update(&shm_data->stats, sems.sem_stats, 200, st.st_size);
     }
@@ -368,11 +457,10 @@ if (stat(fullpath, &st) < 0) {
     free(file_data);
 }
 
-
 /**
  * @brief Main function to handle an HTTP request from a client.
  *        Parses, validates, serves files, and logs statistics.
- * @param client_socket Client socket descriptor.
+ * @param conn Connection structure (HTTP or HTTPS).
  */
 void http_handle_request(connection_t* conn) {
     printf("[HTTP] Entrou no http_handle_request com fd %d (HTTPS=%d)\n", 
@@ -393,6 +481,14 @@ void http_handle_request(connection_t* conn) {
         return;
     }
 
+    // Handle API endpoints
+    if (strncmp(req.path, "/api/stats", 10) == 0) {
+        serve_stats_json(conn);
+        logger_log(req.client_ip, req.method, req.path, 200, 0);
+        conn_close(conn);
+        return;
+    }
+
     // Validar método
     int is_head = 0;
     if (strcmp(req.method, "GET") == 0) {
@@ -407,7 +503,7 @@ void http_handle_request(connection_t* conn) {
     }
 
     if (!strcmp(req.path, "/"))
-        strcpy(req.path, "/index.html");
+        strcpy(req.path, "/dashboard.html");
 
     char fullpath[1024];
     snprintf(fullpath, sizeof(fullpath), "%s%s",
