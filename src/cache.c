@@ -5,6 +5,11 @@
 #include <string.h>
 #include <pthread.h>
 #include "cache.h"
+#include "shared_mem.h"
+#include "semaphores.h"
+
+extern shared_data_t* shm_data;
+extern ipc_semaphores_t sems;
 
 static cache_entry_t *cache_table = NULL;
 static size_t cache_capacity = 0;
@@ -59,24 +64,33 @@ void cache_init(int mb) {
  * @return 1 if found, 0 otherwise.
  */
 int cache_get(const char *path, char **data, size_t *size) {
-    // Acquire READ lock - multiple threads can read simultaneously
     pthread_rwlock_rdlock(&cache_rwlock);
 
     size_t idx = hash_path(path);
     cache_entry_t *e = &cache_table[idx];
 
-    if (!e->valid) {
+    if (!e->valid || strcmp(e->path, path) != 0) {
         pthread_rwlock_unlock(&cache_rwlock);
-        return 0;
-    }
-
-    if (strcmp(e->path, path) != 0) {
-        pthread_rwlock_unlock(&cache_rwlock);
+        
+        // CACHE MISS
+        if (shm_data && sems.sem_stats) {
+            sem_wait(sems.sem_stats);
+            shm_data->stats.cache_misses++;
+            sem_post(sems.sem_stats);
+        }
+        
         return 0;
     }
 
     *data = e->data;
     *size = e->size;
+    
+    // CACHE HIT
+    if (shm_data && sems.sem_stats) {
+        sem_wait(sems.sem_stats);
+        shm_data->stats.cache_hits++;
+        sem_post(sems.sem_stats);
+    }
 
     pthread_rwlock_unlock(&cache_rwlock);
     return 1;
@@ -90,17 +104,24 @@ int cache_get(const char *path, char **data, size_t *size) {
  * @param size Size of the data.
  */
 void cache_put(const char *path, char *data, size_t size) {
-    // Acquire WRITE lock - exclusive access for writing
     pthread_rwlock_wrlock(&cache_rwlock);
 
     size_t idx = hash_path(path);
     cache_entry_t *e = &cache_table[idx];
 
-    // clear old entry
+    // NOVO: Se já existe entrada válida com path diferente, não sobrescreve
+    if (e->valid && strcmp(e->path, path) != 0) {
+        printf("[Cache] Collision at index %zu: '%s' vs '%s' - skipping\n",
+               idx, e->path, path);
+        pthread_rwlock_unlock(&cache_rwlock);
+        return;
+    }
+
+    // Limpa entrada antiga
     if (e->valid && e->data)
         free(e->data);
 
-    // store
+    // Armazena nova entrada
     e->data = malloc(size);
     memcpy(e->data, data, size);
     e->size = size;

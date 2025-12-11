@@ -12,5 +12,6 @@ typedef struct {
 
 // Cada worker recebe o listen_fd (socket de escuta) do master
 void worker_main(int listen_fd);
+int dequeue_connection(void);
 
 #endif

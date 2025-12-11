@@ -4,6 +4,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <time.h>
+#include <string.h>
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
@@ -16,6 +20,7 @@
 /**
  * @brief Ponteiro global para a memória partilhada, acessível por outros módulos.
  */
+
 shared_data_t* shm_data = NULL;
 
 /**
@@ -72,24 +77,22 @@ static int init_ssl_context(void) {
  * @param listen_fd File descriptor do socket de escuta (aceita novas ligações TCP).
  */
 void worker_main(int listen_fd) {
-    // Attach to shared memory created by master
-    shm_data = shm_create();
+    // 1. Attach to shared memory (NÃO cria)
+    shm_data = shm_attach_worker();
     if (!shm_data) {
-        fprintf(stderr, "Worker %d: Failed to attach to shared memory\n", getpid());
+        fprintf(stderr, "Worker %d: Failed to attach SHM\n", getpid());
         exit(1);
     }
 
-    // Open existing semaphores created by master
-    sems.sem_empty = sem_open("/sem_ws_empty", 0);
-    sems.sem_full  = sem_open("/sem_ws_full", 0);
-    sems.sem_mutex = sem_open("/sem_ws_mutex", 0);
-    sems.sem_stats = sem_open("/sem_ws_stats", 0);
-    sems.sem_log   = sem_open("/sem_ws_log", 0);
+    // 2. Abre semáforos existentes
+    sems.sem_accept = sem_open("/sem_ws_accept", 0);
+    sems.sem_stats  = sem_open("/sem_ws_stats", 0);
+    sems.sem_log    = sem_open("/sem_ws_log", 0);
 
-    if (sems.sem_empty == SEM_FAILED || sems.sem_full == SEM_FAILED || 
-        sems.sem_mutex == SEM_FAILED || sems.sem_stats == SEM_FAILED ||
+    if (sems.sem_accept == SEM_FAILED || 
+        sems.sem_stats == SEM_FAILED ||
         sems.sem_log == SEM_FAILED) {
-        perror("Worker: Failed to open semaphores");
+        perror("Worker: sem_open failed");
         exit(1);
     }
 
@@ -100,28 +103,72 @@ void worker_main(int listen_fd) {
     }
 
     // criar thread pool local deste worker
+    // 3. Cria thread pool
     thread_pool_t pool;
     thread_pool_init(&pool, get_threads_per_worker());
 
     printf("Worker %d iniciado.\n", getpid());
+    
+    printf("Worker %d initialized with %d threads\n", 
+           getpid(), get_threads_per_worker());
 
+    // 4. LOOP PRINCIPAL: Worker faz accept() controlado
     while (1) {
+        // PRODUTOR-CONSUMIDOR: Aguarda "autorização" para aceitar
+        // (controla carga do sistema)
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += 5;  // Timeout de 5s
+        
+        if (sem_timedwait(sems.sem_accept, &ts) < 0) {
+            if (errno == ETIMEDOUT) {
+                continue;  // Tenta novamente
+            }
+            perror("sem_timedwait");
+            continue;
+        }
+
+        // CRITICAL: Incrementa contador de accepts ativos
+        sem_wait(sems.sem_stats);
+        shm_data->accept_ctrl.active_accepts++;
+        sem_post(sems.sem_stats);
+
+        // ACCEPT: Agora pode aceitar uma conexão
         struct sockaddr_in client_addr;
         socklen_t len = sizeof(client_addr);
 
         // cada worker faz accept() directamente
         int client_socket = accept(listen_fd,
                                    (struct sockaddr *)&client_addr,
+        
+        int client_socket = accept(listen_fd, 
+                                   (struct sockaddr *)&client_addr, 
                                    &len);
 
+        // CRITICAL: Decrementa contador
+        sem_wait(sems.sem_stats);
+        shm_data->accept_ctrl.active_accepts--;
+        if (client_socket >= 0) {
+            shm_data->accept_ctrl.total_accepted++;
+        }
+        sem_post(sems.sem_stats);
+
+        // Liberta o "ticket" para outro worker
+        sem_post(sems.sem_accept);
+
         if (client_socket < 0) {
-            perror("worker accept");
+            if (errno == EINTR || errno == EAGAIN) {
+                continue;
+            }
+            perror("accept");
             continue;
         }
 
         printf("Worker %d recebeu socket %d de %s:%d\n",
                getpid(),
                client_socket,
+        printf("Worker %d: Accepted socket %d from %s:%d\n",
+               getpid(), client_socket,
                inet_ntoa(client_addr.sin_addr),
                ntohs(client_addr.sin_port));
 
@@ -171,5 +218,15 @@ void worker_main(int listen_fd) {
     // Cleanup (nunca chega aqui no loop infinito, mas boa prática)
     if (ssl_ctx) {
         SSL_CTX_free(ssl_ctx);
+        // Envia para thread pool processar
+        if (thread_pool_add(&pool, client_socket) < 0) {
+            // Thread pool cheio - fecha socket
+            const char *resp = "HTTP/1.1 503 Service Unavailable\r\n"
+                             "Content-Type: text/plain\r\n"
+                             "Connection: close\r\n\r\n"
+                             "Server overloaded\n";
+            send(client_socket, resp, strlen(resp), 0);
+            close(client_socket);
+        }
     }
 }
