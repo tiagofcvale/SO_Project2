@@ -3,5 +3,6 @@
 
 // Each worker receives the listen_fd (listening socket) from the master
 void worker_main(int listen_fd);
+int dequeue_connection(void);
 
 #endif

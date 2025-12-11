@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <semaphore.h>
+#include <string.h>
 #include "stats.h"
 
 /**
@@ -8,14 +9,7 @@
  */
 void stats_init(server_stats_t *stats) {
     if (stats) {
-        stats->total_requests = 0;
-        stats->bytes_transferred = 0;
-        stats->status_200 = 0;
-        stats->status_400 = 0;
-        stats->status_403 = 0;
-        stats->status_404 = 0;
-        stats->status_500 = 0;
-        stats->active_connections = 0;
+        memset(stats, 0, sizeof(server_stats_t));
     }
 }
 
@@ -30,9 +24,7 @@ void stats_init(server_stats_t *stats) {
 void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long bytes) {
     if (!stats || !mutex) return;
 
-    // Enter critical section (Blocks other processes)
     sem_wait(mutex);
-
     stats->total_requests++;
     stats->bytes_transferred += bytes;
 
@@ -43,8 +35,6 @@ void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long byt
         case 404: stats->status_404++; break;
         case 500: stats->status_500++; break;
     }
-
-    // Exit critical section (Releases for other processes)
     sem_post(mutex);
 }
 
@@ -59,7 +49,6 @@ void stats_connection_start(server_stats_t *stats, sem_t *mutex) {
     stats->active_connections++;
     sem_post(mutex);
 }
-
 /**
  * @brief Safely decrements the number of active connections.
  * @param stats Pointer to the statistics structure.
@@ -81,21 +70,33 @@ void stats_print(server_stats_t *stats, sem_t *mutex) {
     if (!stats || !mutex) return;
     
     server_stats_t snapshot;
-
-    // Quick copy to avoid blocking the server while printing
     sem_wait(mutex);
     snapshot = *stats;
     sem_post(mutex);
 
-    printf("\n=== Statistics ===\n");
-    printf("Total Requests:   %ld\n", snapshot.total_requests);
-    printf("Bytes:            %ld\n", snapshot.bytes_transferred);
-    printf("Active:           %d\n", snapshot.active_connections);
-    printf("\n--- HTTP Status Codes ---\n");
-    printf("200 OK:           %ld\n", snapshot.status_200);
-    printf("400 Bad Request:  %ld\n", snapshot.status_400);
-    printf("403 Forbidden:    %ld\n", snapshot.status_403);
-    printf("404 Not Found:    %ld\n", snapshot.status_404);
-    printf("500 Server Error: %ld\n", snapshot.status_500);
-    printf("========================\n");
+    printf("\n======================================\n");
+    printf("         SERVER STATISTICS              \n");
+    printf("========================================\n");
+    printf(" Total Requests:      %10ld       \n", snapshot.total_requests);
+    printf(" Bytes Transferred:   %10ld       \n", snapshot.bytes_transferred);
+    printf(" Active Connections:  %10d       \n", snapshot.active_connections);
+    printf("========================================\n");
+    printf(" HTTP Status Codes:                     \n");
+    printf("   200 OK:            %10ld       \n", snapshot.status_200);
+    printf("   400 Bad Request:   %10ld       \n", snapshot.status_400);
+    printf("   403 Forbidden:     %10ld       \n", snapshot.status_403);
+    printf("   404 Not Found:     %10ld       \n", snapshot.status_404);
+    printf("   500 Server Error:  %10ld       \n", snapshot.status_500);
+    printf("========================================\n");
+    printf(" Cache Statistics:                      \n");
+    printf("   Hits:              %10ld       \n", snapshot.cache_hits);
+    printf("   Misses:            %10ld       \n", snapshot.cache_misses);
+    
+    if ((snapshot.cache_hits + snapshot.cache_misses) > 0) {
+        double hit_rate = (double)snapshot.cache_hits / 
+                         (snapshot.cache_hits + snapshot.cache_misses) * 100.0;
+        printf("   Hit Rate:          %9.2f%%      \n", hit_rate);
+    }
+    
+    printf("========================================\n");
 }

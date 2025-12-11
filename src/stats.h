@@ -12,8 +12,11 @@ typedef struct {
     long status_404;
     long status_500;
     int active_connections;
+    
+    // CACHE STATS
+    long cache_hits;
+    long cache_misses;
 } server_stats_t;
-
 
 void stats_init(server_stats_t *stats);
 void stats_update(server_stats_t *stats, sem_t *mutex, int status_code, long bytes);
