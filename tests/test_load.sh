@@ -237,7 +237,7 @@ test_request "404 - Non-existent path" "$BASE_URL/dir1/dir2/naoexiste.html" "404
 # Test 1.13: 403 Forbidden (directory)
 mkdir -p www/testdir 2>/dev/null
 echo "test" > www/testdir/file.txt
-test_request "403 - Directory access" "$BASE_URL/testdir" "403"
+test_request "403 - Directory access" "$BASE_URL/test_files/testdir" "403"
 
 # Test 1.14: 501 Not Implemented (POST)
 test_request "501 - POST not implemented" "$BASE_URL/" "501" "-X POST"
