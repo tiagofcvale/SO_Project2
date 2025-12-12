@@ -4,381 +4,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Server Dashboard - Real-time Statistics</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
-            padding: 20px;
-            min-height: 100vh;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .status-indicator {
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            background: #10b981;
-            box-shadow: 0 0 20px #10b981;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .header .subtitle {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-
-        .last-update {
-            text-align: right;
-            opacity: 0.7;
-            font-size: 0.9em;
-            margin-top: 10px;
-        }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            background: #1e293b;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-            border: 1px solid #334155;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
-        }
-
-        .card-title {
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #94a3b8;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .card-value {
-            font-size: 3em;
-            font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.2;
-        }
-
-        .card-subtitle {
-            color: #64748b;
-            font-size: 0.9em;
-            margin-top: 10px;
-        }
-
-        .chart-container {
-            background: #1e293b;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-            border: 1px solid #334155;
-            margin-bottom: 30px;
-        }
-
-        .chart-title {
-            font-size: 1.3em;
-            margin-bottom: 20px;
-            color: #e2e8f0;
-        }
-
-        canvas {
-            width: 100% !important;
-            height: 300px !important;
-        }
-
-        .stats-table {
-            background: #1e293b;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-            border: 1px solid #334155;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            text-align: left;
-            padding: 15px;
-            background: #0f172a;
-            color: #94a3b8;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 1px;
-        }
-
-        td {
-            padding: 15px;
-            border-top: 1px solid #334155;
-        }
-
-        tr:hover {
-            background: #0f172a;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 600;
-        }
-
-        .badge-success {
-            background: #10b981;
-            color: white;
-        }
-
-        .badge-warning {
-            background: #f59e0b;
-            color: white;
-        }
-
-        .badge-error {
-            background: #ef4444;
-            color: white;
-        }
-
-        .badge-info {
-            background: #3b82f6;
-            color: white;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #334155;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            transition: width 0.5s ease;
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.95em;
-        }
-
-        button.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        button.primary:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        button.secondary {
-            background: #334155;
-            color: #e2e8f0;
-        }
-
-        button.secondary:hover {
-            background: #475569;
-        }
-
-        .alert {
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .alert-info {
-            background: #1e3a8a;
-            border-left: 4px solid #3b82f6;
-        }
-
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.8em;
-            }
-            
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .card-value {
-                font-size: 2em;
-            }
-        }
-    </style>
 </head>
 <body>
-    <div class="header">
-        <h1>
-            <span class="status-indicator"></span>
-            Server Dashboard
-        </h1>
-        <div class="subtitle">Real-time Performance Monitoring</div>
-        <div class="last-update">Last update: <span id="lastUpdate">--</span></div>
-    </div>
 
-    <div class="alert alert-info">
-        <span>ℹ️</span>
-        <span>Dashboard atualiza automaticamente a cada 2 segundos. Os dados são obtidos do endpoint <code>/api/stats</code>.</span>
-    </div>
+    <header>
+        <h1>Server Dashboard</h1>
+        <p>Real-time Performance Monitoring</p>
+        <p><small>Last update: <span id="lastUpdate">--</span></small></p>
+    </header>
 
-    <div class="controls">
-        <button class="primary" onclick="refreshStats()">🔄 Refresh Now</button>
-        <button class="secondary" onclick="toggleAutoRefresh()">
-            <span id="autoRefreshBtn">⏸️ Pause Auto-refresh</span>
-        </button>
-        <button class="secondary" onclick="resetStats()">🗑️ Reset Stats</button>
-    </div>
 
-    <div class="dashboard-grid">
-        <div class="card">
-            <div class="card-title">📊 Total Requests</div>
-            <div class="card-value" id="totalRequests">0</div>
-            <div class="card-subtitle">Since server start</div>
-        </div>
+    <hr>
 
-        <div class="card">
-            <div class="card-title">✅ Successful (200 OK)</div>
-            <div class="card-value" id="requests200">0</div>
-            <div class="card-subtitle" id="percent200">0% of total</div>
-        </div>
+    <main>
+        <h2>Current Statistics</h2>
+        
+        <ul>
+            <li>
+                <h3>Total Requests</h3>
+                <p><strong>Value:</strong> <span id="totalRequests">0</span></p>
+                <p><em>Since server start</em></p>
+            </li>
 
-        <div class="card">
-            <div class="card-title">❌ Not Found (404)</div>
-            <div class="card-value" id="requests404">0</div>
-            <div class="card-subtitle" id="percent404">0% of total</div>
-        </div>
+            <li>
+                <h3>Successful (200 OK)</h3>
+                <p><strong>Value:</strong> <span id="requests200">0</span></p>
+                <p><em><span id="percent200">0% of total</span></em></p>
+            </li>
 
-        <div class="card">
-            <div class="card-title">⚠️ Server Errors (500)</div>
-            <div class="card-value" id="requests500">0</div>
-            <div class="card-subtitle" id="percent500">0% of total</div>
-        </div>
+            <li>
+                <h3>Not Found (404)</h3>
+                <p><strong>Value:</strong> <span id="requests404">0</span></p>
+                <p><em><span id="percent404">0% of total</span></em></p>
+            </li>
 
-        <div class="card">
-            <div class="card-title">📦 Data Transferred</div>
-            <div class="card-value" id="bytesServed">0 MB</div>
-            <div class="card-subtitle">Total bandwidth used</div>
-        </div>
+            <li>
+                <h3>Server Errors (500)</h3>
+                <p><strong>Value:</strong> <span id="requests500">0</span></p>
+                <p><em><span id="percent500">0% of total</span></em></p>
+            </li>
 
-        <div class="card">
-            <div class="card-title">💾 Cache Performance</div>
-            <div class="card-value" id="cacheHitRate">0%</div>
-            <div class="card-subtitle">
-                <span id="cacheHits">0</span> hits / <span id="cacheMisses">0</span> misses
-            </div>
-        </div>
-    </div>
+            <li>
+                <h3>Data Transferred</h3>
+                <p><strong>Value:</strong> <span id="bytesServed">0 MB</span></p>
+                <p><em>Total bandwidth used</em></p>
+            </li>
 
-    <div class="chart-container">
-        <div class="chart-title">📈 Request Distribution</div>
-        <canvas id="requestChart"></canvas>
-    </div>
+            <li>
+                <h3>Cache Performance</h3>
+                <p><strong>Value:</strong> <span id="cacheHitRate">0%</span></p>
+                <p><em><span id="cacheHits">0</span> hits / <span id="cacheMisses">0</span> misses</em></p>
+            </li>
 
-    <div class="chart-container">
-        <div class="chart-title">⏱️ Requests Over Time</div>
-        <canvas id="timeChart"></canvas>
-    </div>
+            <li>
+                <h3>Server Uptime</h3>
+                <p><strong>Value:</strong> <span id="uptime">0h 0m</span></p>
+                <p><em>Time since server start</em></p>
+            </li>
 
-    <div class="stats-table">
-        <div class="chart-title">📋 Detailed Statistics</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Metric</th>
-                    <th>Value</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="detailedStats">
-                <tr>
-                    <td>Server Uptime</td>
-                    <td id="uptime">--</td>
-                    <td><span class="badge badge-success">Running</span></td>
-                </tr>
-                <tr>
-                    <td>Average Response Time</td>
-                    <td id="avgResponseTime">--</td>
-                    <td><span class="badge badge-info">Good</span></td>
-                </tr>
-                <tr>
-                    <td>Requests per Second</td>
-                    <td id="reqPerSec">--</td>
-                    <td><span class="badge badge-success">Normal</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+            <li>
+                <h3>Average Response Time</h3>
+                <p><strong>Value:</strong> <span id="avgResponseTime">0ms</span></p>
+                <p><em>Average request latency</em></p>
+            </li>
+
+            <li>
+                <h3>Requests Per Second</h3>
+                <p><strong>Value:</strong> <span id="reqPerSec">0 req/s</span></p>
+                <p><em>Current throughput</em></p>
+            </li>
+        </ul>
+
+        <hr>
+
+    </main>
+    
+    <footer>
+        <p>Bernardo Coelho 125059 - Tiago Vale 125913</p>
+    </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script>
         let autoRefresh = true;
         let refreshInterval;
-        let requestChart, timeChart;
         let timeSeriesData = [];
         const maxDataPoints = 20;
         let serverStartTime = Date.now();
@@ -390,62 +98,21 @@
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        labels: { color: '#e2e8f0' }
+                        labels: { color: '#333' }
                     }
                 },
                 scales: {
                     y: {
-                        ticks: { color: '#94a3b8' },
-                        grid: { color: '#334155' }
+                        ticks: { color: '#666' },
+                        grid: { color: '#ddd' }
                     },
                     x: {
-                        ticks: { color: '#94a3b8' },
-                        grid: { color: '#334155' }
+                        ticks: { color: '#666' },
+                        grid: { color: '#ddd' }
                     }
                 }
             };
 
-            // Request distribution pie chart
-            const ctx1 = document.getElementById('requestChart').getContext('2d');
-            requestChart = new Chart(ctx1, {
-                type: 'doughnut',
-                data: {
-                    labels: ['200 OK', '404 Not Found', '500 Error', 'Others'],
-                    datasets: [{
-                        data: [0, 0, 0, 0],
-                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#6366f1'],
-                        borderColor: '#1e293b',
-                        borderWidth: 3
-                    }]
-                },
-                options: {
-                    ...chartOptions,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: '#e2e8f0', padding: 20 }
-                        }
-                    }
-                }
-            });
-
-            // Time series line chart
-            const ctx2 = document.getElementById('timeChart').getContext('2d');
-            timeChart = new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Requests',
-                        data: [],
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: chartOptions
-            });
         }
 
         // Fetch stats from server (mock data for now)
@@ -504,14 +171,6 @@
             document.getElementById('cacheHits').textContent = stats.cache_hits.toLocaleString();
             document.getElementById('cacheMisses').textContent = stats.cache_misses.toLocaleString();
             
-            // Update charts
-            requestChart.data.datasets[0].data = [
-                stats.status_200,
-                stats.status_404,
-                stats.status_500,
-                total - stats.status_200 - stats.status_404 - stats.status_500
-            ];
-            requestChart.update();
             
             // Update time series
             const now = new Date().toLocaleTimeString();
@@ -520,9 +179,6 @@
                 timeSeriesData.shift();
             }
             
-            timeChart.data.labels = timeSeriesData.map(d => d.time);
-            timeChart.data.datasets[0].data = timeSeriesData.map(d => d.requests);
-            timeChart.update();
             
             // Update timestamp
             document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
@@ -540,35 +196,13 @@
                 `${(stats.total_requests / (uptimeMs / 1000)).toFixed(2)} req/s`;
         }
 
-        // Control functions
-        function refreshStats() {
-            updateDashboard();
-        }
 
-        function toggleAutoRefresh() {
-            autoRefresh = !autoRefresh;
-            const btn = document.getElementById('autoRefreshBtn');
-            
-            if (autoRefresh) {
-                btn.textContent = '⏸️ Pause Auto-refresh';
-                startAutoRefresh();
-            } else {
-                btn.textContent = '▶️ Resume Auto-refresh';
-                clearInterval(refreshInterval);
-            }
-        }
 
-        function resetStats() {
-            if (confirm('Reset all statistics? This will clear all data.')) {
-                serverStartTime = Date.now();
-                timeSeriesData = [];
-                updateDashboard();
-            }
-        }
+        
 
-        function startAutoRefresh() {
-            refreshInterval = setInterval(updateDashboard, 2000);
-        }
+        
+
+        
 
         // Initialize on page load
         window.addEventListener('load', () => {
@@ -577,5 +211,6 @@
             startAutoRefresh();
         });
     </script>
+
 </body>
 </html>
