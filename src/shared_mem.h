@@ -5,11 +5,11 @@
 
 #define SHM_NAME "/webserver_shm_v1"
 
-// A fila agora é de "tickets" não de sockets
+// The queue is now of "tickets" not sockets
 typedef struct {
-    int capacity;        // Capacidade máxima
-    int active_accepts;  // Quantos workers estão em accept() agora
-    int total_accepted;  // Total de conexões aceites (estatística)
+    int capacity;        // Maximum capacity
+    int active_accepts;  // How many workers are in accept() now
+    int total_accepted;  // Total accepted connections (statistic)
 } accept_control_t;
 
 typedef struct {

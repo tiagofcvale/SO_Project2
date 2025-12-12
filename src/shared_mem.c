@@ -9,7 +9,7 @@
 #include "shared_mem.h"
 
 shared_data_t* shm_create_master(void) {
-    // Remove SHM anterior se existir
+    // Remove previous SHM if it exists
     shm_unlink(SHM_NAME);
     
     int fd = shm_open(SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0666);
@@ -35,14 +35,14 @@ shared_data_t* shm_create_master(void) {
         return NULL;
     }
     
-    // Inicializa estrutura
+    // Initialize structure
     memset(ptr, 0, sizeof(shared_data_t));
     
     return ptr;
 }
 
 shared_data_t* shm_attach_worker(void) {
-    int fd = shm_open(SHM_NAME, O_RDWR, 0666);  // SEM O_CREAT
+    int fd = shm_open(SHM_NAME, O_RDWR, 0666);  // WITHOUT O_CREAT
     if (fd == -1) {
         perror("shm_open (worker)");
         return NULL;

@@ -1,10 +1,10 @@
 #ifndef MASTER_H
 #define MASTER_H
 
-// Inicia o servidor master (socket, workers, SSL)
+// Starts the master server (socket, workers, SSL)
 int master_start(void);
 
-// Para e limpa recursos do servidor
+// Stops and cleans up server resources
 int master_stop(void);
 
 #endif

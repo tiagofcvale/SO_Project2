@@ -5,24 +5,24 @@
 #include <openssl/err.h>
 
 /*
- * Estrutura que guarda o contexto SSL do servidor.
+ * Structure that stores the server's SSL context.
  */
 typedef struct {
     SSL_CTX *ctx;
 } ssl_server_ctx_t;
 
 /**
- * Inicializa a biblioteca OpenSSL e cria um contexto SSL.
+ * Initializes the OpenSSL library and creates an SSL context.
  */
 ssl_server_ctx_t* ssl_server_init(const char *cert_path, const char *key_path);
 
 /**
- * Liberta o contexto SSL.
+ * Frees the SSL context.
  */
 void ssl_server_cleanup(ssl_server_ctx_t *server_ctx);
 
 /**
- * Cria um objeto SSL associado ao file descriptor da ligação.
+ * Creates an SSL object associated with the connection's file descriptor.
  */
 SSL* ssl_create_for_fd(ssl_server_ctx_t *server_ctx, int client_fd);
 
