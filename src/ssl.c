@@ -8,9 +8,9 @@
 
 ssl_server_ctx_t* ssl_server_init(const char *cert_path, const char *key_path)
 {
-    printf("[SSL] A inicializar OpenSSL...\n");
+    printf("[SSL] Initializing OpenSSL...\n");
     
-    // Inicializar biblioteca OpenSSL
+    // Initialize OpenSSL library
     SSL_load_error_strings();
     OpenSSL_add_ssl_algorithms();
     ERR_load_crypto_strings();
@@ -21,7 +21,7 @@ ssl_server_ctx_t* ssl_server_init(const char *cert_path, const char *key_path)
         return NULL;
     }
 
-    // Criar contexto SSL com método TLS genérico
+    // Create SSL context with generic TLS method
     const SSL_METHOD *method = TLS_server_method();
     server_ctx->ctx = SSL_CTX_new(method);
     
@@ -32,17 +32,17 @@ ssl_server_ctx_t* ssl_server_init(const char *cert_path, const char *key_path)
         return NULL;
     }
 
-    // Configurar opções SSL
+    // Configure SSL options
     SSL_CTX_set_options(server_ctx->ctx, 
                         SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | 
                         SSL_OP_NO_COMPRESSION);
     
-    // Definir versão mínima do TLS
+    // Set minimum TLS version
     SSL_CTX_set_min_proto_version(server_ctx->ctx, TLS1_2_VERSION);
 
-    printf("[SSL] A carregar certificado: %s\n", cert_path);
+    printf("[SSL] Loading certificate: %s\n", cert_path);
     
-    // Carregar certificado
+    // Load certificate
     if (SSL_CTX_use_certificate_file(server_ctx->ctx, cert_path, SSL_FILETYPE_PEM) <= 0) {
         fprintf(stderr, "[SSL] ERRO: Falha ao carregar certificado '%s'\n", cert_path);
         ERR_print_errors_fp(stderr);
@@ -51,10 +51,10 @@ ssl_server_ctx_t* ssl_server_init(const char *cert_path, const char *key_path)
         return NULL;
     }
     
-    printf("[SSL] Certificado carregado com sucesso\n");
-    printf("[SSL] A carregar chave privada: %s\n", key_path);
+    printf("[SSL] Certificate loaded successfully\n");
+    printf("[SSL] Loading private key: %s\n", key_path);
 
-    // Carregar chave privada
+    // Load private key
     if (SSL_CTX_use_PrivateKey_file(server_ctx->ctx, key_path, SSL_FILETYPE_PEM) <= 0) {
         fprintf(stderr, "[SSL] ERRO: Falha ao carregar chave privada '%s'\n", key_path);
         ERR_print_errors_fp(stderr);
@@ -63,9 +63,9 @@ ssl_server_ctx_t* ssl_server_init(const char *cert_path, const char *key_path)
         return NULL;
     }
     
-    printf("[SSL] Chave privada carregada com sucesso\n");
+    printf("[SSL] Private key loaded successfully\n");
 
-    // Verificar se a chave e o certificado correspondem
+    // Check if the key and certificate match
     if (!SSL_CTX_check_private_key(server_ctx->ctx)) {
         fprintf(stderr, "[SSL] ERRO CRÍTICO: Certificado e chave privada não correspondem!\n");
         ERR_print_errors_fp(stderr);
@@ -74,8 +74,8 @@ ssl_server_ctx_t* ssl_server_init(const char *cert_path, const char *key_path)
         return NULL;
     }
 
-    printf("[SSL] ✓ Certificado e chave verificados e correspondentes\n");
-    printf("[SSL] ✓ SSL inicializado com sucesso\n");
+    printf("[SSL] ✓ Certificate and key verified and matching\n");
+    printf("[SSL] ✓ SSL initialized successfully\n");
 
     return server_ctx;
 }
@@ -84,7 +84,7 @@ void ssl_server_cleanup(ssl_server_ctx_t *server_ctx)
 {
     if (!server_ctx) return;
 
-    printf("[SSL] A limpar recursos SSL...\n");
+    printf("[SSL] Cleaning up SSL resources...\n");
     
     SSL_CTX_free(server_ctx->ctx);
     EVP_cleanup();
@@ -92,25 +92,25 @@ void ssl_server_cleanup(ssl_server_ctx_t *server_ctx)
     
     free(server_ctx);
     
-    printf("[SSL] Recursos SSL libertados\n");
+    printf("[SSL] SSL resources freed\n");
 }
 
 SSL* ssl_create_for_fd(ssl_server_ctx_t *server_ctx, int client_fd)
 {
     if (!server_ctx || !server_ctx->ctx) {
-        fprintf(stderr, "[SSL] ssl_create_for_fd: contexto inválido\n");
+        fprintf(stderr, "[SSL] ssl_create_for_fd: invalid context\n");
         return NULL;
     }
 
     SSL *ssl = SSL_new(server_ctx->ctx);
     if (!ssl) {
-        fprintf(stderr, "[SSL] Erro ao criar objeto SSL\n");
+        fprintf(stderr, "[SSL] Error creating SSL object\n");
         ERR_print_errors_fp(stderr);
         return NULL;
     }
 
     if (SSL_set_fd(ssl, client_fd) == 0) {
-        fprintf(stderr, "[SSL] Erro ao associar SSL ao FD %d\n", client_fd);
+        fprintf(stderr, "[SSL] Error associating SSL to FD %d\n", client_fd);
         ERR_print_errors_fp(stderr);
         SSL_free(ssl);
         return NULL;
@@ -122,7 +122,7 @@ SSL* ssl_create_for_fd(ssl_server_ctx_t *server_ctx, int client_fd)
 int ssl_perform_handshake(SSL *ssl)
 {
     if (!ssl) {
-        fprintf(stderr, "[SSL] ssl_perform_handshake: SSL é NULL\n");
+        fprintf(stderr, "[SSL] ssl_perform_handshake: SSL is NULL\n");
         return 0;
     }
 
@@ -131,7 +131,7 @@ int ssl_perform_handshake(SSL *ssl)
     if (ret <= 0) {
         int err = SSL_get_error(ssl, ret);
         
-        fprintf(stderr, "[SSL] Handshake falhou (ret=%d, err=%d)\n", ret, err);
+        fprintf(stderr, "[SSL] Handshake failed (ret=%d, err=%d)\n", ret, err);
         
         switch (err) {
             case SSL_ERROR_WANT_READ:
@@ -148,14 +148,14 @@ int ssl_perform_handshake(SSL *ssl)
                 fprintf(stderr, "[SSL] SSL_ERROR_SSL (protocol error)\n");
                 break;
             default:
-                fprintf(stderr, "[SSL] Erro SSL desconhecido: %d\n", err);
+                fprintf(stderr, "[SSL] Unknown SSL error: %d\n", err);
         }
         
         ERR_print_errors_fp(stderr);
         return 0;
     }
     
-    printf("[SSL] Handshake bem sucedido (cipher: %s)\n", SSL_get_cipher(ssl));
+    printf("[SSL] Handshake successful (cipher: %s)\n", SSL_get_cipher(ssl));
     return 1;
 }
 
@@ -168,11 +168,11 @@ int ssl_read_wrapper(SSL *ssl, void *buf, int size)
     if (n <= 0) {
         int err = SSL_get_error(ssl, n);
         if (err == SSL_ERROR_ZERO_RETURN) {
-            // Conexão fechada normalmente
+            // Connection closed normally
             return 0;
         }
         if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
-            fprintf(stderr, "[SSL] Erro no SSL_read (err=%d)\n", err);
+            fprintf(stderr, "[SSL] Error in SSL_read (err=%d)\n", err);
             ERR_print_errors_fp(stderr);
         }
         return -1;
@@ -193,7 +193,7 @@ int ssl_write_wrapper(SSL *ssl, const void *buf, int size)
             return 0;
         }
         if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
-            fprintf(stderr, "[SSL] Erro no SSL_write (err=%d)\n", err);
+            fprintf(stderr, "[SSL] Error in SSL_write (err=%d)\n", err);
             ERR_print_errors_fp(stderr);
         }
         return -1;

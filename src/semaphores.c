@@ -8,7 +8,7 @@ int sem_init_ipc(ipc_semaphores_t *sems, int max_concurrent_accepts) {
     sem_unlink("/sem_ws_stats");
     sem_unlink("/sem_ws_log");
 
-    // Permite N workers aceitarem simultaneamente (controlo de carga)
+    // Allows N workers to accept simultaneously (load control)
     sems->sem_accept = sem_open("/sem_ws_accept", O_CREAT, 0666, max_concurrent_accepts);
     sems->sem_stats  = sem_open("/sem_ws_stats", O_CREAT, 0666, 1);
     sems->sem_log    = sem_open("/sem_ws_log",   O_CREAT, 0666, 1);

@@ -2,12 +2,12 @@
 #define THREAD_POOL_H
 
 #include <pthread.h>
-#include "worker.h"  // Para connection_t
+#include "worker.h"  // For connection_t
 
 #define WORKER_QUEUE_SIZE 128
 
 typedef struct {
-    connection_t* connections[WORKER_QUEUE_SIZE];  // Mudado de int sockets[] para connection_t*
+    connection_t* connections[WORKER_QUEUE_SIZE];  // Changed from int sockets[] to connection_t*
     int front;
     int rear;
     int count;
@@ -23,6 +23,6 @@ typedef struct {
 } thread_pool_t;
 
 void thread_pool_init(thread_pool_t *pool, int n);
-void thread_pool_add(thread_pool_t *pool, connection_t* conn);  // Mudado de int para connection_t*
+void thread_pool_add(thread_pool_t *pool, connection_t* conn);  // Changed from int to connection_t*
 
 #endif
