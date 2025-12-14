@@ -8,40 +8,19 @@
 #include "cache.h"
 #include "master.h"
 
-
 /**
- * @brief Main function of the HTTP server. Loads configuration, initializes modules
- *        (logger, cache), and starts the master process that manages workers and IPC resources.
+ * @brief Main function of the HTTP server. Loads configuration and starts the master process.
  * @return 0 on success, 1 on critical error.
  */
 int main(void) {
+    printf("Starting HTTP/HTTPS Server...\n");
+    printf("===============================\n");
 
-    // 1. Load configuration
-    if (load_config("server.conf") != 0) {
-        fprintf(stderr, "Error loading configuration.\n");
-        return 1;
-    }
-
-    printf("Starting HTTP server with:\n");
-    printf("- Workers: %d\n", get_num_workers());
-    printf("- Threads per worker: %d\n", get_threads_per_worker());
-    printf("- Document root: %s\n", get_document_root());
-    printf("- Cache: %d MB\n", get_cache_size_mb());
-
-    // 2. Start Logger
-    logger_init();
-
-    // 3. Start Cache (Global for the Master, inherited by Workers on fork)
-    cache_init(get_cache_size_mb());
-
-    // NOTE: stats_init removed from here.
-    // Now master_start() initializes stats inside Shared Memory.
-
-    // 4. Start the Master (Creates SHM, Semaphores, Sockets, and Workers)
+    // Start the Master (which handles everything else)
     if (master_start() != 0) {
         fprintf(stderr, "Critical error starting server.\n");
         return 1;
     }
-    // O master faz cleanup dos recursos, não precisa repetir aqui
+
     return 0;
 }

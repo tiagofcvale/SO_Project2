@@ -21,13 +21,10 @@
 #include "stats.h"
 #include "shared_mem.h"
 #include "semaphores.h"
+#include "global.h"
 
 #define MAX_REQ 2048
 #define MAX_REQ_LINE 2048
-
-// External references to shared memory and semaphores from worker.c
-extern shared_data_t* shm_data;
-extern ipc_semaphores_t sems;
 
 /**
  * @brief Returns the appropriate MIME type for a file based on its extension.
