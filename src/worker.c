@@ -112,7 +112,7 @@ void worker_main(int listen_fd, int is_https_listener) {
         exit(1);
     }
 
-        // Start thread pool
+    // Start thread pool
     thread_pool_t pool;
     int nthreads = get_threads_per_worker();
     thread_pool_init(&pool, nthreads);
