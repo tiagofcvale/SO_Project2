@@ -8,11 +8,11 @@ BUILD_DIR = build
 
 TARGET = server
 
-# Ficheiros fonte na pasta src/ (ADICIONADO fd_passing.c)
+# Ficheiros fonte na pasta src/ (ADICIONADO ssl.c)
 SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/master.c $(SRC_DIR)/worker.c $(SRC_DIR)/http.c \
        $(SRC_DIR)/thread_pool.c $(SRC_DIR)/cache.c $(SRC_DIR)/logger.c $(SRC_DIR)/stats.c \
        $(SRC_DIR)/config.c $(SRC_DIR)/shared_mem.c $(SRC_DIR)/semaphores.c $(SRC_DIR)/global.c \
-       $(SRC_DIR)/ssl.c $(SRC_DIR)/fd_passing.c
+       $(SRC_DIR)/ssl.c
 
 # Objetos na pasta build/
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
@@ -37,19 +37,18 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 # Explicit dependencies
 $(BUILD_DIR)/main.o: $(SRC_DIR)/main.c $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/stats.h $(SRC_DIR)/cache.h $(SRC_DIR)/master.h
-$(BUILD_DIR)/master.o: $(SRC_DIR)/master.c $(SRC_DIR)/master.h $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/worker.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/ssl.h $(SRC_DIR)/fd_passing.h $(SRC_DIR)/global.h $(SRC_DIR)/cache.h
-$(BUILD_DIR)/worker.o: $(SRC_DIR)/worker.c $(SRC_DIR)/worker.h $(SRC_DIR)/config.h $(SRC_DIR)/thread_pool.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/ssl.h $(SRC_DIR)/fd_passing.h $(SRC_DIR)/global.h
-$(BUILD_DIR)/http.o: $(SRC_DIR)/http.c $(SRC_DIR)/http.h $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/cache.h $(SRC_DIR)/stats.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/global.h
+$(BUILD_DIR)/master.o: $(SRC_DIR)/master.c $(SRC_DIR)/master.h $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/worker.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/ssl.h
+$(BUILD_DIR)/worker.o: $(SRC_DIR)/worker.c $(SRC_DIR)/worker.h $(SRC_DIR)/config.h $(SRC_DIR)/thread_pool.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/ssl.h
+$(BUILD_DIR)/http.o: $(SRC_DIR)/http.c $(SRC_DIR)/http.h $(SRC_DIR)/config.h $(SRC_DIR)/logger.h $(SRC_DIR)/cache.h $(SRC_DIR)/stats.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h
 $(BUILD_DIR)/thread_pool.o: $(SRC_DIR)/thread_pool.c $(SRC_DIR)/thread_pool.h $(SRC_DIR)/http.h
-$(BUILD_DIR)/cache.o: $(SRC_DIR)/cache.c $(SRC_DIR)/cache.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/global.h
+$(BUILD_DIR)/cache.o: $(SRC_DIR)/cache.c $(SRC_DIR)/cache.h
 $(BUILD_DIR)/logger.o: $(SRC_DIR)/logger.c $(SRC_DIR)/logger.h $(SRC_DIR)/config.h
 $(BUILD_DIR)/stats.o: $(SRC_DIR)/stats.c $(SRC_DIR)/stats.h
 $(BUILD_DIR)/config.o: $(SRC_DIR)/config.c $(SRC_DIR)/config.h
-$(BUILD_DIR)/shared_mem.o: $(SRC_DIR)/shared_mem.c $(SRC_DIR)/shared_mem.h $(SRC_DIR)/stats.h
+$(BUILD_DIR)/shared_mem.o: $(SRC_DIR)/shared_mem.c $(SRC_DIR)/shared_mem.h $(SRC_DIR)/connection_queue.h $(SRC_DIR)/stats.h
 $(BUILD_DIR)/semaphores.o: $(SRC_DIR)/semaphores.c $(SRC_DIR)/semaphores.h
-$(BUILD_DIR)/global.o: $(SRC_DIR)/global.c $(SRC_DIR)/global.h $(SRC_DIR)/shared_mem.h $(SRC_DIR)/semaphores.h $(SRC_DIR)/ssl.h
+$(BUILD_DIR)/global.o: $(SRC_DIR)/global.c $(SRC_DIR)/global.h
 $(BUILD_DIR)/ssl.o: $(SRC_DIR)/ssl.c $(SRC_DIR)/ssl.h
-$(BUILD_DIR)/fd_passing.o: $(SRC_DIR)/fd_passing.c $(SRC_DIR)/fd_passing.h
 
 # Create www directory structure and example pages
 setup_www:
@@ -113,7 +112,7 @@ clean:
 
 # Full cleanup (including orphaned IPC resources)
 distclean: clean
-	rm -f /dev/shm/webserver_shm_v2
+	rm -f /dev/shm/webserver_shm_v1
 	rm -f /dev/shm/sem.sem_ws_*
 	rm -f access.log
 	rm -rf www/

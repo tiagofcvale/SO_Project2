@@ -3,18 +3,18 @@
 
 #include "stats.h"
 
-#define SHM_NAME "/webserver_shm_v2"
-#define CONN_QUEUE_SIZE 256  // Still used for semaphore initialization
-#define MAX_WORKERS 32
+#define SHM_NAME "/webserver_shm_v1"
 
-// Shared data structure
+// The queue is now of "tickets" not sockets
 typedef struct {
+    int capacity;        // Maximum capacity
+    int active_accepts;  // How many workers are in accept() now
+    int total_accepted;  // Total accepted connections (statistic)
+} accept_control_t;
+
+typedef struct {
+    accept_control_t accept_ctrl;
     server_stats_t stats;
-    
-    // Unix domain sockets for passing FDs to workers
-    // [0] = master's end, [1] = worker's end
-    int worker_sockets[MAX_WORKERS][2];
-    int num_workers;
 } shared_data_t;
 
 shared_data_t* shm_create_master(void);

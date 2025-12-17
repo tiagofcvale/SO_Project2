@@ -1,12 +1,15 @@
+// ===================== worker.c (SSL FIXED) =====================
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
-#include <fcntl.h>
+#include <arpa/inet.h>
 #include <errno.h>
+#include <time.h>
+#include <string.h>
+#include <fcntl.h>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -17,16 +20,28 @@
 #include "shared_mem.h"
 #include "semaphores.h"
 #include "ssl.h"
-#include "global.h"
-#include "fd_passing.h"
 
+// Global reference to the SSL_CTX created in master
+extern ssl_server_ctx_t *global_ssl_ctx;
+
+// Worker's shared memory
+shared_data_t* shm_data = NULL;
+ipc_semaphores_t sems;
+
+/**
+ * @brief Sets a socket as blocking
+ */
 static int set_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) return -1;
     return fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
 }
 
+/**
+ * @brief Tries to perform SSL handshake with timeout
+ */
 static int ssl_accept_with_timeout(SSL *ssl, int fd, int timeout_sec) {
+    // Temporarily block the socket for SSL_accept
     set_blocking(fd);
     
     struct timeval tv;
@@ -39,104 +54,139 @@ static int ssl_accept_with_timeout(SSL *ssl, int fd, int timeout_sec) {
     
     if (ret <= 0) {
         int ssl_err = SSL_get_error(ssl, ret);
-        fprintf(stderr, "[Worker %d] SSL_accept failed: error=%d\n", getpid(), ssl_err);
-        ERR_print_errors_fp(stderr);
-        return -1;
+        
+        switch (ssl_err) {
+            case SSL_ERROR_WANT_READ:
+            case SSL_ERROR_WANT_WRITE:
+                fprintf(stderr, "[Worker %d] SSL_accept: needs more data\n", getpid());
+                return -1;
+                
+            case SSL_ERROR_SYSCALL:
+                if (errno == ETIMEDOUT) {
+                    fprintf(stderr, "[Worker %d] SSL_accept: timeout\n", getpid());
+                } else {
+                    fprintf(stderr, "[Worker %d] SSL_accept: syscall error (errno=%d)\n", 
+                            getpid(), errno);
+                    ERR_print_errors_fp(stderr);
+                }
+                return -1;
+                
+            case SSL_ERROR_SSL:
+                fprintf(stderr, "[Worker %d] SSL_accept: SSL protocol error\n", getpid());
+                ERR_print_errors_fp(stderr);
+                return -1;
+                
+            case SSL_ERROR_ZERO_RETURN:
+                fprintf(stderr, "[Worker %d] SSL_accept: connection closed\n", getpid());
+                return -1;
+                
+            default:
+                fprintf(stderr, "[Worker %d] SSL_accept: unknown error %d\n", 
+                        getpid(), ssl_err);
+                ERR_print_errors_fp(stderr);
+                return -1;
+        }
     }
     
+    printf("[Worker %d] SSL handshake completed successfully\n", getpid());
     return 0;
 }
 
-void worker_main(int unix_sock) {
-    // Attach shared memory
+void worker_main(int listen_fd, int is_https_listener) {
+    // SHM
     shm_data = shm_attach_worker();
     if (!shm_data) {
         fprintf(stderr, "[Worker %d] Failed to attach SHM\n", getpid());
         exit(1);
     }
 
-    // Open semaphores
-    sems.sem_queue_mutex = sem_open("/sem_ws_queue_mutex", 0);
-    sems.sem_queue_empty = sem_open("/sem_ws_queue_empty", 0);
-    sems.sem_queue_full  = sem_open("/sem_ws_queue_full", 0);
-    sems.sem_stats       = sem_open("/sem_ws_stats", 0);
-    sems.sem_log         = sem_open("/sem_ws_log", 0);
+    // IPC SEMAPHORES
+    sems.sem_accept = sem_open("/sem_ws_accept", 0);
+    sems.sem_stats  = sem_open("/sem_ws_stats", 0);
+    sems.sem_log    = sem_open("/sem_ws_log", 0);
 
-    if (sems.sem_queue_mutex == SEM_FAILED ||
-        sems.sem_queue_empty == SEM_FAILED ||
-        sems.sem_queue_full == SEM_FAILED ||
+    if (sems.sem_accept == SEM_FAILED ||
         sems.sem_stats == SEM_FAILED ||
-        sems.sem_log == SEM_FAILED) {
+        sems.sem_log   == SEM_FAILED) {
         perror("Worker sem_open");
         exit(1);
     }
 
-    // Start thread pool
+        // Start thread pool
     thread_pool_t pool;
     int nthreads = get_threads_per_worker();
     thread_pool_init(&pool, nthreads);
 
-    printf("[Worker %d] Started with %d threads (CONSUMER mode)\n", 
-           getpid(), nthreads);
+    const char* type = is_https_listener ? "HTTPS" : "HTTP";
+        printf("[Worker %d] Started with %d threads - Type: %s\n",
+            getpid(), nthreads, type);
 
-    // Worker CONSUMER loop
+    // Check if we have SSL context available for HTTPS worker
+    if (is_https_listener && !global_ssl_ctx) {
+        fprintf(stderr, "[Worker %d] ERRO: Worker HTTPS sem SSL context!\n", getpid());
+        exit(1);
+    }
+
+    struct sockaddr_in client_addr;
+    socklen_t len = sizeof(client_addr);
+
+    // Worker's accept loop
     while (1) {
-        // Receive file descriptor from master
-        fd_metadata_t meta;
-        int client_fd = recv_fd(unix_sock, &meta);
-        
-        if (client_fd < 0) {
-            fprintf(stderr, "[Worker %d] Failed to receive FD, exiting\n", getpid());
-            break;
-        }
-        
-        printf("[Worker %d] Received connection fd=%d (type=%s) from %s:%d\n",
-               getpid(), client_fd, meta.is_https ? "HTTPS" : "HTTP",
-               meta.client_ip, meta.client_port);
+        int client_socket = accept(listen_fd,(struct sockaddr *)&client_addr,&len);
 
-        // Create connection_t for thread pool
+        if (client_socket < 0) {
+            if (errno == EINTR || errno == EAGAIN)
+                continue;
+            perror("accept");
+            continue;
+        }
+
+        printf("[Worker %d] Accepted connection fd=%d from %s:%d (Type: %s)\n",
+               getpid(),
+               client_socket,
+               inet_ntoa(client_addr.sin_addr),
+               ntohs(client_addr.sin_port),
+               type);
+
+        // Create connection_t for the thread pool
         connection_t *conn = malloc(sizeof(connection_t));
         if (!conn) {
-            fprintf(stderr, "[Worker %d] Memory allocation error\n", getpid());
-            close(client_fd);
+            fprintf(stderr, "[Worker %d] Error allocating connection_t\n", getpid());
+            close(client_socket);
             continue;
         }
         
-        conn->fd = client_fd;
-        conn->is_https = meta.is_https;
+        conn->fd = client_socket;
+        conn->is_https = is_https_listener;
         conn->ssl = NULL;
 
         // If HTTPS → create SSL object and perform handshake
-        if (meta.is_https) {
-            if (!global_ssl_ctx) {
-                fprintf(stderr, "[Worker %d] ERROR: No SSL context available\n", getpid());
-                close(client_fd);
-                free(conn);
-                continue;
-            }
+        if (is_https_listener) {
+            printf("[Worker %d] Starting SSL handshake...\n", getpid());
             
             conn->ssl = SSL_new(global_ssl_ctx->ctx);
             if (!conn->ssl) {
                 fprintf(stderr, "[Worker %d] Error creating SSL object\n", getpid());
                 ERR_print_errors_fp(stderr);
-                close(client_fd);
+                close(client_socket);
                 free(conn);
                 continue;
             }
             
-            if (SSL_set_fd(conn->ssl, client_fd) != 1) {
+            if (SSL_set_fd(conn->ssl, client_socket) != 1) {
                 fprintf(stderr, "[Worker %d] Error associating SSL to socket\n", getpid());
                 ERR_print_errors_fp(stderr);
                 SSL_free(conn->ssl);
-                close(client_fd);
+                close(client_socket);
                 free(conn);
                 continue;
             }
             
-            if (ssl_accept_with_timeout(conn->ssl, client_fd, 10) != 0) {
+            // Perform SSL handshake with 10 second timeout
+            if (ssl_accept_with_timeout(conn->ssl, client_socket, 10) != 0) {
                 fprintf(stderr, "[Worker %d] SSL handshake failed\n", getpid());
                 SSL_free(conn->ssl);
-                close(client_fd);
+                close(client_socket);
                 free(conn);
                 continue;
             }
@@ -145,9 +195,7 @@ void worker_main(int unix_sock) {
                    getpid(), SSL_get_cipher(conn->ssl));
         }
 
-        // Send to thread pool
+        // Send to the thread pool
         thread_pool_add(&pool, conn);
     }
-    
-    close(unix_sock);
 }

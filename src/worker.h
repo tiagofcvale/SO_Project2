@@ -6,11 +6,11 @@
 // Structure for connection (can be HTTP or HTTPS)
 typedef struct {
     int fd;          // Socket file descriptor
-    SSL *ssl;        // SSL context (NULL if plain HTTP)
-    int is_https;    // 1 if HTTPS, 0 if HTTP
+    SSL *ssl;        // SSL context (NULL se for HTTP normal)
+    int is_https;    // 1 se for HTTPS, 0 se for HTTP
 } connection_t;
 
-// Worker main function - receives FDs through Unix socket
-void worker_main(int unix_sock);
+// Each worker receives the listen_fd (listening socket) and is_https_listener flag
+void worker_main(int listen_fd, int is_https_listener);
 
 #endif

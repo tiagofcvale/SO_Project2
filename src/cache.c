@@ -7,7 +7,9 @@
 #include "cache.h"
 #include "shared_mem.h"
 #include "semaphores.h"
-#include "global.h"
+
+extern shared_data_t* shm_data;
+extern ipc_semaphores_t sems;
 
 static cache_entry_t *cache_table = NULL;
 static size_t cache_capacity = 0;
@@ -49,8 +51,8 @@ void cache_init(int mb) {
     // Initialize the reader-writer lock
     pthread_rwlock_init(&cache_rwlock, NULL);
 
-    printf("Cache initialized with %zu entries (~%d MB) [RW-Lock]\n",
-           cache_capacity, mb);
+        printf("Cache initialized with %zu entries (~%d MB) [RW-Lock]\n",
+            cache_capacity, mb);
 }
 
 
@@ -107,7 +109,7 @@ void cache_put(const char *path, char *data, size_t size) {
     size_t idx = hash_path(path);
     cache_entry_t *e = &cache_table[idx];
 
-    // Se já existe entrada válida com path diferente, não sobrescreve
+    // NOVO: Se já existe entrada válida com path diferente, não sobrescreve
     if (e->valid && strcmp(e->path, path) != 0) {
         printf("[Cache] Collision at index %zu: '%s' vs '%s' - skipping\n",
                idx, e->path, path);
